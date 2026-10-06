@@ -1,0 +1,34 @@
+# systemd unit example. Copy to /etc/systemd/system/team-board.service, adjust the paths and user, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now team-board
+#
+# Assumes:
+#   - the code is checked out at /srv/team-board with a virtualenv in /srv/team-board/.venv
+#   - a dedicated user "board" owns the config and the data directory
+#   - the config (auth: "token", host: "127.0.0.1") is at /etc/team-board/config.json, mode 600, owned by "board"
+#   - a reverse proxy on the same machine serves HTTPS and forwards to 127.0.0.1:10890 (see Caddyfile.example)
+[Unit]
+Description=Team Board
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=board
+Group=board
+WorkingDirectory=/srv/team-board
+Environment=TEAM_BOARD_CONFIG=/etc/team-board/config.json
+# Only if GitHub sync is enabled in the config; keep the token in a root-readable file, not in this unit:
+# EnvironmentFile=/etc/team-board/github.env
+ExecStart=/srv/team-board/.venv/bin/python -m team_board start
+Restart=on-failure
+RestartSec=3
+
+# Hardening: the service only needs its data directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/team-board
+
+[Install]
+WantedBy=multi-user.target

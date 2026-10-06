@@ -1,0 +1,214 @@
+<style>
+{# 看板页放开页壳的 1100px 限宽，时间线才铺得开。只在看板页加载 #}
+main{max-width:min(1900px,97vw)}
+.bd{ {%- for c in stage_colors %}--st{{ loop.index0 }}:{{ c }};{% endfor %}--ver:#6b7387;--bad:#f2877e;{% for k, c in person_colors.items() %}--p-{{ k }}:{{ c }};{% endfor %}}
+.bd h3{margin:26px 0 10px;font-size:18px}
+.bd-head{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.bd-head h2{margin:0;font-size:26px}
+.bd-head form{margin:0}
+.bd-dim{color:var(--dim);font-size:13px}
+.bd-warn{color:var(--warn);font-size:13px}
+.bd-msg{padding:8px 12px;border-radius:6px;margin:8px 0;border:1px solid var(--line)}
+.bd-msg.bad{border-color:var(--bad);color:var(--bad)}
+.bd-msg.good{border-color:var(--ok)}
+.bd-msg.warn{border-color:var(--warn)}
+{# 练手看板：醒目的黄底说明，一眼知道这里的记录不是真的 #}
+.bd-msg.bd-practice-note{background:color-mix(in srgb,#ffd60a 22%,var(--card));border-color:#ffd60a;font-size:14px;line-height:1.6}
+.bd-practice .bd-head h2::after{content:"{{ t('ui.practice_badge') }}";font-size:12px;vertical-align:middle;margin-left:8px;padding:1px 8px;border-radius:999px;background:#ffd60a;color:#1d1d1f;font-weight:600}
+.bd-blockers{list-style:none;padding:0;margin:0}
+.bd-blockers li{padding:5px 0;font-size:15px}
+.bd-tag{display:inline-block;font-size:12px;padding:0 6px;margin-right:8px;border:1px solid var(--line);border-radius:4px;color:var(--dim)}
+.bd-tag-done{border-color:var(--ok);color:var(--ok)}
+a.bd-tag-ver{border-color:var(--acc);color:var(--acc);text-decoration:none}
+{# 筛选栏：页壳的全局样式把 select/input 撑成整行，这里收回成一行 #}
+.bd-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0 6px}
+.bd-filters select,.bd-filters input[type=date]{width:auto;display:inline-block;margin:0}
+.bd-filters label{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin:0;font-size:14px}
+.bd-filters input[type=checkbox]{width:auto;margin:0}
+.bd-filters button{width:auto;margin:0}
+.bd-range{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 8px;font-size:14px}
+.bd-range a{padding:3px 10px;border:1px solid var(--line);border-radius:14px;text-decoration:none}
+.bd-range a:hover{border-color:var(--acc)}
+{# 横向拖时间线不触发浏览器「返回上一页」手势：滚动容器到头也不往外传。
+   整页关掉横向越界那条只放在首页模板（index.html）：这份样式详情页、版本页也引用，放这里会把它们的左右滑动返回一起关掉 #}
+.bd-scroll{overflow-x:auto;overscroll-behavior-x:contain;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:6px 0 10px;margin:6px 0}
+{# 时间线：左边名称列固定不动，右边是一整条，按缩放放宽，左右拖动看；图里的位置都是整条宽度的百分比 #}
+.bd-tl{--lw:360px;--cw:1000px;width:calc(var(--lw) + var(--cw))}
+{# 行高只给下限：名称折两行再带小牌子时，固定行高会让名字下面那行被下一行压住只露半截；
+   现在名称列内容多就把整行撑高，色块仍从顶上 16px 起画，寿命线贴底 #}
+.bd-row{display:grid;grid-template-columns:var(--lw) var(--cw);align-items:stretch;min-height:38px}
+.bd-item .bd-lbl{padding-top:4px;padding-bottom:4px;box-sizing:border-box}
+.bd-row[hidden]{display:none}
+{# 子任务之间要分得开：每一项上面一道细线横穿名称和图；一棵新的目标树从粗一点的线开始；
+   子目标的名称左边一道竖线，看得出它属于上面那一项 #}
+.bd-item{border-top:1px solid rgba(255,255,255,.07)}
+.bd-item.bd-top{border-top:1.5px solid rgba(255,255,255,.2)}
+.bd-linerow + .bd-item{border-top:none}
+.bd-child .bd-lbl-text{border-left:2px solid rgba(255,255,255,.14);padding-left:8px;align-self:stretch}
+.bd-lbl{position:sticky;left:0;z-index:3;background:var(--card);display:flex;align-items:center;gap:4px;min-width:0;font-size:15px;padding-right:8px;box-shadow:1px 0 0 var(--line)}
+.bd-lbl-text{min-width:0;display:flex;flex-direction:column;justify-content:center}
+.bd-lbl-title{display:flex;align-items:center;min-width:0;gap:6px;line-height:1.25}
+{# 长名称换两行，不截断；鼠标悬停有全名 #}
+.bd-lbl-title a:not(.bd-vn){display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-width:5em;flex:0 1 auto}
+.bd-lbl-title .bd-who,.bd-lbl-title .bd-vn,.bd-lbl-title .bd-sampletag,.bd-lbl-title .bd-others{flex:none}
+{# 负责人以外还涉及谁：「+」后面一串小块（母任务和子任务都要一直看得见谁参与）；看板的人自己那块点亮 #}
+.bd-others{display:inline-flex;align-items:center;gap:4px}
+.bd-others em{font-style:normal;color:var(--dim);font-size:11px}
+.bd-who.bd-me{color:var(--fg);font-weight:600;border:1px solid var(--acc);border-radius:9px;padding:0 5px 0 4px}
+{# 目标编号 G17 与人名小块：小、淡，不抢名字 #}
+.bd-gid{flex:none;font-size:11.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+{# 出生号「G1.3 · A24」：比编号更小更淡 #}
+.bd-gid .bd-src{font-size:10.5px;opacity:.75;font-weight:400}
+.bd-who{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:var(--dim);white-space:nowrap}
+.bd-who i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.bd-belongs{color:var(--dim)}
+{# 跨线家族：同一个业务目标拆到几条线，所有块共用一种很淡的底色；鼠标放上去整家一起亮 #}
+.bd-fam0 .bd-lbl,.bd-fam0 .bd-chart{background:rgba(255,255,255,.035)}
+.bd-fam1 .bd-lbl,.bd-fam1 .bd-chart{background:rgba(255,255,255,.07)}
+.bd-fam2 .bd-lbl,.bd-fam2 .bd-chart{background:rgba(255,255,255,.105)}
+.bd-fam3 .bd-lbl,.bd-fam3 .bd-chart{background:rgba(255,255,255,.14)}
+.bd-fam0 .bd-lbl{background:color-mix(in srgb,var(--card) 96.5%,#fff)}
+.bd-fam1 .bd-lbl{background:color-mix(in srgb,var(--card) 93%,#fff)}
+.bd-fam2 .bd-lbl{background:color-mix(in srgb,var(--card) 89.5%,#fff)}
+.bd-fam3 .bd-lbl{background:color-mix(in srgb,var(--card) 86%,#fff)}
+.bd-fam-hi .bd-lbl{background:color-mix(in srgb,var(--card) 84%,var(--acc))}
+.bd-fam-holder .bd-lbl{background:color-mix(in srgb,var(--card) 84%,var(--acc))}
+.bd-fam-holder.bd-linerow{background:color-mix(in srgb,var(--acc) 16%,transparent)}
+.bd-fam-note{color:var(--acc);white-space:nowrap}
+.bd-fam-hi .bd-chart{background:color-mix(in srgb,transparent 84%,var(--acc))}
+.bd-info{font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd-late{color:var(--bad)}
+{# 已结束的目标：名字变淡，名称下面一行绿色「已完成 MM-DD」，图上完成那一刻一个绿色 ✓；放弃的灰色 ✕ #}
+.bd-ended .bd-lbl-title a{color:var(--dim)}
+.bd-ended .bd-seg,.bd-ended .bd-life{opacity:.6}
+.bd-done-text{color:var(--ok);font-weight:600}
+.bd-abandoned-text{color:var(--dim)}
+.bd-end{position:absolute;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;font-style:normal;font-size:12px;line-height:18px;text-align:center;font-weight:700;z-index:2;box-shadow:0 0 0 2px var(--card)}
+.bd-end-done{background:var(--ok);color:#fff}
+.bd-end-abandoned{background:var(--dim);color:var(--card)}
+.bd-legend i.bd-lg-done{width:14px;height:14px;border-radius:50%;background:var(--ok)}
+{# 版本牌：这个目标挂在哪个版本（里程碑）下，人话名字，点了进版本页 #}
+.bd-vn{flex:none;font-size:11px;padding:0 6px;border:1px solid var(--acc);border-radius:9px;color:var(--acc);text-decoration:none;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+.bd-chart{position:relative;min-width:0}
+.bd-axis{min-height:42px}
+.bd-tick{position:absolute;top:4px;padding-left:4px;font-size:12.5px;color:var(--dim);white-space:nowrap;display:none}
+.bd-tick.mon{color:var(--fg)}
+.zoom-day .bd-tick,.zoom-week .bd-tick,.zoom-2week .bd-tick,.zoom-month .bd-tick.mon,.zoom-quarter .bd-tick.mon{display:block}
+{# 「一天」档：小时刻度（计划到小时后要看得出几点） #}
+.bd-htick{position:absolute;top:22px;padding-left:3px;font-size:11px;color:var(--dim);white-space:nowrap;display:none}
+.zoom-day .bd-htick{display:block}
+.zoom-day .bd-today-label{top:4px;transform:translateX(4px)}
+.bd-grid i.hour{display:none;opacity:.35}
+.zoom-day .bd-grid i.hour{display:block}
+.zoom-day .bd-grid i.day,.zoom-day .bd-grid i.mon{border-left-width:1.5px}
+.zoom-month .bd-tick em,.zoom-quarter .bd-tick em{display:none}
+.bd-tick em{font-style:normal}
+.bd-today-label{position:absolute;top:22px;font-size:13px;font-weight:600;color:var(--acc);transform:translateX(-50%)}
+.bd-tl-body{position:relative}
+.bd-grid{position:absolute;top:0;bottom:0;left:var(--lw);width:var(--cw);pointer-events:none}
+.bd-grid i{position:absolute;top:0;bottom:0;border-left:1px solid var(--line)}
+.bd-grid i.day{display:none;opacity:.45}
+.zoom-week .bd-grid i.day,.zoom-2week .bd-grid i.day{display:block;opacity:1}
+.zoom-month .bd-grid i.day{display:block}
+.bd-grid i.mon{border-left-width:1.5px}
+.bd-grid i.bd-todayline{border-left:2px dashed var(--acc);z-index:2}
+{# 线的分区：序号 + 线自己的颜色，颜色只在标题行底色和左侧色带；
+   不再隔行铺底色，底色留给跨线家族 #}
+.bd-band{--lc:var(--acc);position:relative;border-top:8px solid var(--bg);padding-bottom:8px}
+.bd-band .bd-lbl{border-left:4px solid var(--lc)}
+.bd-linerow{background:color-mix(in srgb,var(--lc) 12%,transparent)}
+.bd-linerow .bd-lbl{background:color-mix(in srgb,var(--lc) 12%,var(--card))}
+.bd-linerow b{font-size:17px;white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
+.bd-lnum{font-size:19px;color:var(--lc);font-weight:500}
+.bd-bandnote{margin-left:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+{# 两种点击分开、各有反馈（不然展开和进详情分不清、常点错）：
+   进详情 = 只认名字那几个字，悬停名字蓝底 + 下划线；展开收起 = 名字以外的区域，悬停时三角亮起来提示。两种反馈互斥 #}
+.bd-fold{all:unset;cursor:pointer;color:var(--acc);width:22px;height:26px;line-height:26px;text-align:center;font-size:17px;flex:none;border-radius:6px;transition:background .12s}
+.bd-fold-sp{width:22px;flex:none}
+.bd-linerow{cursor:pointer}
+.bd-item .bd-lbl:has(.bd-fold){cursor:pointer}
+.bd-linerow:hover .bd-fold,.bd-item .bd-lbl:has(.bd-fold):hover .bd-fold{background:color-mix(in srgb,var(--acc) 28%,transparent)}
+.bd-item .bd-lbl:has(.bd-lbl-title a:hover) .bd-fold{background:none}
+.bd-lbl-title a:not(.bd-vn){padding:0 3px;margin:0 -3px;border-radius:4px}
+.bd-lbl-title a:not(.bd-vn):hover{background:color-mix(in srgb,var(--acc) 26%,transparent);text-decoration:underline;text-underline-offset:2px}
+.bd-sampletag{flex:none;font-size:11px;padding:0 5px;border:1px dashed var(--dim);border-radius:4px;color:var(--dim)}
+.bd-hidden-note{color:var(--dim);font-size:12px;margin-left:6px;white-space:nowrap}
+.bd-out-note{color:var(--dim);white-space:nowrap}
+{# 行进出的提示：贴在日期表头正下方居中 #}
+.bd-toast{position:fixed;left:50%;top:120px;transform:translate(-50%,-10px);z-index:60;background:var(--fg);color:var(--bg);padding:9px 18px;border-radius:999px;font-size:14px;font-weight:600;box-shadow:0 12px 34px rgba(0,0,0,.3);opacity:0;transition:opacity .22s,transform .25s cubic-bezier(.2,.8,.2,1);pointer-events:none;max-width:80vw}
+.bd-toast.show{opacity:1;transform:translate(-50%,0)}
+.bd-toast[hidden]{display:none}
+.bd-hidden-note .bd-who{font-size:12px;margin-left:2px}
+{# 按人筛选：他的事点亮，为了带出路径的上层变淡 #}
+.bd-match .bd-lbl{background:color-mix(in srgb,var(--card) 86%,var(--acc))}
+.bd-match .bd-lbl-title a{font-weight:600}
+.bd-path .bd-lbl-text,.bd-path .bd-chart{opacity:.5}
+.bd-seg{position:absolute;border-radius:4px;box-shadow:0 0 0 1.5px var(--card);overflow:hidden;white-space:nowrap;text-overflow:clip;text-align:center;font-size:13px;font-weight:600;color:#15171a;padding:0 2px;box-sizing:border-box}
+.bd-seg.bd-plain{color:var(--fg);font-weight:500}
+.bd-verrow .bd-lbl a{color:var(--dim)}
+.bd-carried{font-size:11.5px;color:var(--dim)}
+.bd-carried>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:15px}
+.bd-verrow .bd-carried a{color:var(--acc);text-decoration:none}
+.bd-verrow .bd-carried a:hover{text-decoration:underline;text-underline-offset:2px}
+.bd-practice-note a{white-space:nowrap}
+.bd-pause{position:absolute;top:14px;bottom:6px;border-radius:4px;border:1px solid var(--dim);background:repeating-linear-gradient(45deg,rgba(150,150,160,.55) 0 3px,transparent 3px 7px);font-size:11px;color:var(--fg);overflow:hidden;white-space:nowrap;text-align:center}
+.bd-life{position:absolute;bottom:3px;height:3px;border-radius:2px;background:var(--ver);opacity:.8}
+{# 「还在做」虚线：没做完的事从现在往后一条淡虚线，开着的环节同色、没分环节灰 #}
+.bd-future{position:absolute;height:0;border-top:2px dashed var(--dim);opacity:.55;pointer-events:auto}
+.bd-life.bd-life-future{height:0;background:none;border-top:3px dashed var(--ver);border-radius:0;opacity:.6}
+.bd-legend i.bd-lg-future{height:0;border-top:2px dashed var(--fg);border-radius:0;opacity:.7;vertical-align:middle}
+.bd-over{position:absolute;top:13px;bottom:1px;border:2.5px solid var(--bad);border-radius:5px;box-sizing:border-box}
+.bd-late-label{position:absolute;top:0;transform:translateX(-100%);padding-right:2px;font-size:11px;line-height:13px;font-weight:600;color:var(--bad);white-space:nowrap}
+.bd-mark{position:absolute;top:2px;bottom:2px;border-left:2.5px solid var(--fg)}
+.bd-mark.replan{border-left:2px dashed var(--fg)}
+.bd-mark-label,.bd-start-label{position:absolute;top:0;padding-left:5px;font-size:11px;line-height:13px;color:var(--fg);white-space:nowrap;opacity:.85}
+.bd-start-label{color:var(--dim);padding-left:1px}
+.bd-mark-label.flip{transform:translateX(-100%);padding-left:0;padding-right:5px}
+.bd-legend i.bd-lg-pause{background:repeating-linear-gradient(45deg,var(--dim) 0 2px,transparent 2px 5px);border:1px solid var(--dim)}
+.bd-legend i.bd-lg-mark{width:0;height:14px;border-left:2.5px solid var(--fg);border-radius:0}
+.bd-dict-help{font-size:13px;line-height:1.55;display:flex;flex-direction:column;gap:3px;margin-bottom:2px}
+.bd-notes{list-style:none;padding:0;margin:8px 0 0}
+.bd-notes li{border-top:1px solid var(--line);padding:8px 0}
+.bd-notes .txt{white-space:pre-wrap;margin:4px 0}
+.bd-voided{text-decoration:line-through;opacity:.55}
+.bd-inline{display:inline-flex;gap:6px;align-items:center;margin:0}
+.bd-inline input,.bd-inline select{width:auto;margin:0;padding:2px 6px}
+.bd-inline button{width:auto;margin:0;padding:2px 10px}
+.bd-legend{display:flex;gap:8px 16px;flex-wrap:wrap;font-size:13px;color:var(--dim);margin:8px 0 12px}
+.bd-legend i{display:inline-block;width:16px;height:12px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.bd table{border-collapse:collapse;width:100%;max-width:960px}
+.bd td,.bd th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top;font-size:14px}
+.bd-forms{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin:10px 0}
+{# 「现在在做什么」：每条线一张卡，带线的颜色；卡里写了负责人，不另按人排 #}
+.bd-doing{margin:6px 0 14px}
+.bd-bylines{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.bd-bylines .bd-card{border-left:4px solid var(--lc,var(--line))}
+.bd-bylines .bd-lnum{font-size:16px}
+.bd-doing b{display:inline-flex;align-items:center;gap:5px}
+.bd-doing .bd-who i{width:9px;height:9px}
+.bd-filters .bd-warn{margin-left:8px}
+.bd-forms form,.bd-card{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;background:var(--card);margin:0}
+.bd-forms label{font-size:13px;color:var(--dim)}
+.bd-forms b,.bd-card b{font-size:15px}
+.bd-sum{font-size:15px;margin:6px 0 10px}
+.bd-stages{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0}
+.bd-stages span{padding:3px 12px;border-radius:14px;font-size:14px;color:#15171a;font-weight:600}
+.bd-manual{margin:18px 0;border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.bd-manual summary,.bd-fold-sec summary{cursor:pointer;color:var(--dim)}
+.bd-manual form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.bd-manual form > b{min-width:90px;font-size:14px}
+.bd-manual input,.bd-manual select{width:auto;margin:0}
+.bd-manual button{width:auto;margin:0}
+.bd-manual label{display:inline-flex;gap:6px;align-items:center;margin:0;font-size:13px;color:var(--dim)}
+.bd-manual textarea{width:min(520px,100%);margin:0;font:inherit;font-size:13px;color:var(--fg)}
+{# 目标概要：「做什么」「做了什么」一段话，保留换行（一条一行的 What's new） #}
+.bd-what{display:grid;grid-template-columns:max-content 1fr;column-gap:10px;line-height:1.6;margin:8px 0}.bd-what b{color:var(--dim);font-weight:500}.bd-what span{white-space:pre-wrap}
+.bd-whats{padding-left:18px}.bd-whats li{margin:6px 0}.bd-what-t{white-space:pre-wrap;line-height:1.6;color:var(--fg);margin-top:2px}
+.bd-what a,.bd-what-t a{overflow-wrap:anywhere}.bd-what a:hover,.bd-what-t a:hover{text-decoration:underline;text-underline-offset:2px}
+.bd-fold-sec{margin:14px 0}
+.bd-btn{all:unset;cursor:pointer;padding:3px 10px;border:1px solid var(--line);border-radius:14px;font-size:14px}
+.bd-btn:hover{border-color:var(--acc)}
+.bd-range .on{border-color:var(--acc);color:var(--fg);font-weight:600}
+.bd-sep{width:10px}
+.bd-jump{width:auto;margin:0;padding:2px 6px}
+</style>

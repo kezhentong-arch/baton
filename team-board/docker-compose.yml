@@ -1,0 +1,28 @@
+# Team Board with Docker Compose.
+#
+#   1. Create a config with random personal tokens (token mode, data under /data). `init` needs only Python 3.11+
+#      on the host, no packages:
+#        mkdir -p config
+#        python3 -m team_board init --lang en --auth token --host 0.0.0.0 --data-dir /data --config config/config.json
+#        chmod 644 config/config.json   # the container user must be able to read it; keep the folder itself private
+#      Then edit config/config.json: your people, lines, stages, time zone.
+#   2. docker compose up -d
+#   3. Put a reverse proxy with HTTPS in front (see deploy/Caddyfile.example); the port below is bound to loopback only.
+#
+# config/ holds personal tokens: keep it out of version control (it is in .gitignore) and readable only by you.
+services:
+  board:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:10890:10890"      # loopback only; the reverse proxy on the host terminates HTTPS
+    volumes:
+      - ./config:/config:ro           # config.json (with tokens), read-only
+      - board-data:/data              # sqlite databases and daily backups
+    environment:
+      TEAM_BOARD_CONFIG: /config/config.json
+      # Only needed if you turn on GitHub sync in the config:
+      # TEAM_BOARD_GITHUB_TOKEN: ${TEAM_BOARD_GITHUB_TOKEN}
+
+volumes:
+  board-data:

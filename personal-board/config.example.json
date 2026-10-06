@@ -1,0 +1,22 @@
+{
+  "lang": "en",
+  "person": {"id": "your-id", "name": "Your Name", "letter": "Y"},
+  "port": 10990,
+  "timezone": {"name": "America/Los_Angeles", "label": "Los Angeles"},
+  "second_timezone": {"name": "Europe/London", "label": "London"},
+  "lines": [
+    {"name": "Product", "color": "#4fa8a0"},
+    {"name": "Growth", "color": "#7a86d6"},
+    {"name": "Operations", "color": "#b7975f"},
+    {"name": "Team", "color": "#8a97a8"},
+    {"name": "Personal", "color": "#9aa5b1", "personal": true}
+  ],
+  "stages": [
+    {"name": "Business", "color": "#a88ef2"},
+    {"name": "Product", "color": "#62a9f2"},
+    {"name": "Design", "color": "#f27aa6"},
+    {"name": "Dev", "color": "#4fcb8e"},
+    {"name": "Test", "color": "#f3ae55"}
+  ],
+  "team_board": {"base_url": "", "token": ""}
+}

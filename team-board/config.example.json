@@ -1,0 +1,43 @@
+{
+  "title": "Team Board",
+  "lang": "en",
+  "auth": "token",
+  "host": "127.0.0.1",
+  "port": 10890,
+  "data_dir": "~/.local/share/team-board",
+  "timezone": {"name": "UTC", "label": "UTC"},
+  "second_timezone": null,
+  "people": [
+    {"id": "alex", "name": "Alex", "color": "#e9c46a", "letter": "A", "role": "owner", "token": "CHANGE-ME-run-init-for-a-random-token-1"},
+    {"id": "ben", "name": "Ben", "color": "#5bc0eb", "letter": "B", "role": "member", "token": "CHANGE-ME-run-init-for-a-random-token-2"},
+    {"id": "chloe", "name": "Chloe", "color": "#ef8fa9", "letter": "C", "role": "member", "token": "CHANGE-ME-run-init-for-a-random-token-3"}
+  ],
+  "lines": [
+    {"name": "Product", "color": "#4fa8a0"},
+    {"name": "Growth", "color": "#7a86d6"},
+    {"name": "Operations", "color": "#b7975f"},
+    {"name": "Team", "color": "#8a97a8"}
+  ],
+  "stages": [
+    {"name": "Business", "color": "#a88ef2"},
+    {"name": "Product", "color": "#62a9f2"},
+    {"name": "Design", "color": "#f27aa6"},
+    {"name": "Dev", "color": "#4fcb8e"},
+    {"name": "Test", "color": "#f3ae55"}
+  ],
+  "github": {
+    "enabled": false,
+    "repos": [{"repo": "your-org/your-repo", "line": "Product"}],
+    "token_env": "TEAM_BOARD_GITHUB_TOKEN",
+    "autosync": false,
+    "since": "2025-01-01T00:00:00Z",
+    "label_prefix": "stage:",
+    "label_map": [
+      {"pattern": "stage: todo", "state": "To do"},
+      {"pattern": "stage: dev", "state": "Dev"},
+      {"pattern": "stage: review", "state": "In review"},
+      {"pattern": "stage: done", "state": "Done"}
+    ],
+    "delivered": ["In review", "Done"]
+  }
+}

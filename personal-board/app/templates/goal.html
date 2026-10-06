@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="{{HTML_LANG}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{t:app.name}}</title>
+<link rel="stylesheet" href="/static/app.css">
+<script>try{var t=localStorage.getItem("mb.theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+<style>
+.wrap{max-width:980px;margin:0 auto;padding:18px}
+.gh{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline}
+.gh h1{font-size:20px;margin:0}.gh .g{color:var(--dim)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin-top:10px;font-size:13.5px}.kv b{color:var(--dim);font-weight:500}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px}td,th{padding:5px 8px;border-top:1px solid var(--line);text-align:left}th{color:var(--dim);font-weight:500;border-top:0}
+.dayh{margin:16px 0 4px;font-weight:600}
+ul.list{list-style:none;margin:0;padding:0}
+td.late{color:#ff3b30;font-weight:600}
+.what{display:grid;grid-template-columns:max-content 1fr;column-gap:10px;margin:8px 0 2px;font-size:14.5px;line-height:1.55}.what[hidden]{display:none}.what span{white-space:pre-wrap}.what b{color:var(--dim);font-weight:500}
+.kv .pre{white-space:pre-wrap}
+.rel{list-style:none;margin:0;padding:0}.rel li{padding:8px 0;border-top:1px solid var(--line)}.rel li:first-child{border-top:0}
+a.url{color:var(--acc);overflow-wrap:anywhere}a.url:hover{text-decoration:underline;text-underline-offset:2px}
+.rel .h{display:flex;gap:10px;align-items:baseline}.rel .h b.v{color:var(--acc);font-weight:600;margin:0}.rel .t{margin-top:3px;white-space:pre-wrap;font-size:13.5px}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-l"><a class="brand" href="{{BASE}}/">← {{t:app.name}}{{MODE_LABEL}}</a></div><div class="top-m" id="clock"></div><div class="top-r"><span class="ver">v<span id="ver"></span></span></div></header>
+<div class="wrap">
+  <div class="card">
+    <div class="gh"><span class="g" id="gnum"></span><h1 id="title"></h1><span id="badges"></span></div>
+    <div class="what" id="what" hidden></div>
+    <div class="kv" id="kv"></div>
+  </div>
+  <div class="card" id="rel-card" style="margin-top:14px" hidden><h3>{{t:tpl.changelog}}</h3><ul class="rel" id="rel"></ul></div>
+  <div class="card" style="margin-top:14px"><h3 id="stages-h">{{t:tpl.stage_spans}}</h3><table id="stages"></table></div>
+  <div class="card" style="margin-top:14px"><h3>{{t:tpl.entries}}</h3><div id="days"></div></div>
+  <div class="two" style="margin:14px 0 40px">
+    <div class="card"><h3>{{t:tpl.todos}}</h3><ul class="todos" id="todos"></ul></div>
+    <div class="card"><h3>{{t:tpl.tasks}}</h3><ul class="list" id="tasks"></ul></div>
+  </div>
+</div>
+{{BOOT}}
+<script>window.__DETAIL__ = {{DETAIL_JSON}}; window.__BASE__ = "{{BASE}}";</script>
+<script>
+(function(){
+  const d = window.__DETAIL__, g = d.goal, $ = id => document.getElementById(id), B = window.__BASE__ || '', T = window.T;
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  /* URLs become links that open in a new tab; everything else is escaped as usual. Only http(s) is recognised; CJK text and
+     full-width punctuation are outside the character set and end a URL naturally; trailing sentence punctuation and an
+     unbalanced closing bracket belong to the text; a bare scheme is not a URL. `javascript:` can never become a link. */
+  const URL_RE = /https?:\/\/[A-Za-z0-9\-._~:\/?#\[\]@!$&'()*+,;=%]+/g, URL_TAIL = `.,;:!?'"`;
+  const linkify = s => {
+    s = String(s ?? ''); let out = '', pos = 0;
+    for (const m of s.matchAll(URL_RE)) {
+      let u = m[0];
+      while (URL_TAIL.includes(u.slice(-1)) || (u.endsWith(')') && u.split('(').length < u.split(')').length)) u = u.slice(0, -1);
+      if (u.endsWith('://')) continue;
+      out += esc(s.slice(pos, m.index)) + `<a class="url" href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`;
+      pos = m.index + u.length;   // stripped punctuation stays with the following text
+    }
+    return out + esc(s.slice(pos));
+  };
+  const pill = (cls, t, style) => `<span class="pill ${cls}" ${style ? `style="${style}"` : ''}>${esc(t)}</span>`;
+  $('clock').textContent = d.header.clock; $('ver').textContent = d.header.version;
+  document.title = `${g.birth || g.gnum} ${g.title} · ${T('app_name')}`;
+  const num2 = x => (x.birth && x.birth !== x.gnum ? esc(x.birth) + ' · ' + esc(x.gnum) : esc(x.gnum));  /* birth number first, team number after */
+  $('gnum').innerHTML = num2(g); $('title').textContent = g.title;
+  $('badges').innerHTML = pill('', `${d.line_mark[0]} ${g.line}`, `background:${d.line_mark[1]}33`) + ' ' +
+    pill('', { active: T('st_active'), done: T('st_done') + ' ' + g.done_at_local, abandoned: T('st_abandoned') }[g.status]) +
+    (g.version_name ? ' ' + pill('', g.version_name, 'color:var(--acc);border:1px solid var(--acc);background:none') : '') +
+    (g.long_term ? ' ' + pill('', T('long_term')) : '') + (g.pending ? ' ' + pill('sync-pending', T('pending_n', { n: g.pending })) : '');
+  /* Goal summary: "What" under the title; once done, "Next" gives way to "Done" (the next step is stale by then); an abandoned
+     goal says why. An empty field is not shown at all: empty means "the title says it all", and a dash would look like an omission. */
+  if (g.what) { $('what').innerHTML = `<b>${T('what')}</b><span>${linkify(g.what)}</span>`; $('what').hidden = false; }
+  const kv = [];
+  if (g.status === 'done') { if (g.done_what) kv.push([T('done_what'), `<span class="pre">${linkify(g.done_what)}</span>`]); }
+  else if (g.status === 'abandoned') { if (d.abandon_reason) kv.push([T('why_abandoned'), `<span class="pre">${linkify(d.abandon_reason)}</span>`]); }
+  else kv.push([T('next'), esc(g.next_step) || '—']);
+  if (g.blocker) kv.push([T('blocker'), esc(g.blocker)]);
+  if (g.point) kv.push([T('moment'), esc(g.point.rule) + (g.point.next ? T('next_occ', { at: esc(g.point.next) }) : '') + T(window.__CFG__.team_board ? 'point_note' : 'point_note_solo')]);
+  else kv.push([T('open_stages'), g.open_stages.length ? g.open_stages.map(esc).join(T('sep')) : (g.has_stages ? '—' : T('no_stage'))]);
+  kv.push([T('source'), g.source === 'team' ? (g.birth ? T('src_pushed') : T('src_team')) : T('src_local')]);
+  if (g.birth) kv.push([T('birth'), esc(g.birth) + (g.birth !== g.gnum ? T('birth_pushed', { gnum: esc(g.gnum), birth: esc(g.birth) }) : '') + T('birth_note')]);
+  kv.push([T('created'), esc(g.created_at_local) + (g.due || g.baseline_due ? ` · ${g.due ? T('plan', { due: esc(g.due) }) : T('plan_unset')}` + (g.baseline_due && g.baseline_due !== g.due ? T('plan_was', { due: esc(g.baseline_due) }) : '') : '')]); /* with the plan cleared, delay is still measured from the original one, so it is written out */
+  if (d.parent) kv.push([T('belongs'), `<a href="${B}/goal/${encodeURIComponent(d.parent.gnum)}">${num2(d.parent)} ${esc(d.parent.title)}</a>`]);
+  if (d.children.length) kv.push([T('blocks'), d.children.map(c => `<a href="${B}/goal/${encodeURIComponent(c.gnum)}">${num2(c)} ${esc(c.title)}</a>${c.status === 'done' ? T('block_done') : ''}`).join(T('sep'))]);
+  $('kv').innerHTML = kv.map(([k, v]) => `<b>${k}</b><span>${v}</span>`).join('');
+  if (d.releases.length) { /* changelog of a long-running row: what each version did, highest first */
+    $('rel').innerHTML = d.releases.map(r => `<li><div class="h"><b class="v">${esc(r.version)}</b><span class="dim">${esc(r.at_local)}${r.kind === 'digest' ? ' · ' + T('digest') : ''}</span></div>${r.text ? `<div class="t">${linkify(r.text)}</div>` : ''}</li>`).join('');
+    $('rel-card').hidden = false;
+  }
+  if (d.point) { // a point task has no stages: list each occurrence and whether it was done — all past ones, then the next two
+    $('stages-h').textContent = T('occurrences');
+    $('stages').innerHTML = `<tr><th>${T('th_moment')}</th><th>${T('th_done')}</th></tr>` + d.point.occ.map(o => `<tr><td>${esc(o.text)}</td><td${o.state === 'overdue' ? ' class="late"' : ''}>${esc(o.state_text)}</td></tr>`).join('');
+  } else $('stages').innerHTML = d.stages.length ? `<tr><th>${T('th_stage')}</th><th>${T('th_start')}</th><th>${T('th_end')}</th><th>${T('th_hours')}</th></tr>` + d.stages.map(s => `<tr><td>${pill('stage', s.stage, `background:${s.color}`)}</td><td>${s.start_local}</td><td>${esc(s.end_local)}</td><td>${T('hours', { n: s.hours })}</td></tr>`).join('') : `<tr><td class="dim">${T('no_stages')}</td></tr>`;
+  const entry = e => `<li class="ent"><span class="at">${esc(e.at_local.slice(6))}</span><div class="m"><span class="kind">${esc(e.kind_label)}</span>${e.version ? pill('', e.version, 'color:var(--acc);border:1px solid var(--acc);background:none') : ''}${e.stage ? pill('stage', e.stage + (e.stage_state ? ' · ' + e.stage_state : ''), `background:${e.stage_color}`) : pill('', T('no_stage'))}${e.task ? `<span>${esc(e.task)}${e.tool ? ' · ' + esc(e.tool) : ''}</span>` : ''}${e.sync ? pill('sync-' + e.sync, e.sync_label + (e.synced_at ? ' ' + e.synced_at : '')) : ''}${e.backfilled ? pill('', T('backfilled')) : ''}</div><div class="txt">${esc(e.text)}</div></li>`;
+  $('days').innerHTML = d.days.length ? d.days.map(x => `<div class="dayh">${esc(x.day)}</div><ul class="list">${x.entries.map(entry).join('')}</ul>`).join('') : `<div class="dim">${T('no_entries')}</div>`;
+  $('todos').innerHTML = d.todos.length ? d.todos.map(t => `<li class="${t.done_at ? 'done' : ''}"><span>${t.done_at ? '☑' : '☐'}</span><span>${esc(t.text)}</span></li>`).join('') : `<li class="dim">${T('no_todos')}</li>`;
+  $('tasks').innerHTML = d.tasks.length ? d.tasks.map(t => `<li>${esc(t.task)}${t.tool ? ` <span class="pill tool">${esc(t.tool)}</span>` : ''}</li>`).join('') : `<li class="dim">${T('no_tasks')}</li>`;
+})();
+</script>
+</body>
+</html>

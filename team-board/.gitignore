@@ -1,0 +1,15 @@
+# Never commit real config (it holds personal tokens) or data.
+config.json
+*.local.json
+.env
+.env.*
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+backups/
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/

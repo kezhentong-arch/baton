@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="{{ html_lang }}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ t('login.title') }} · {{ title }}</title>
+<style>
+:root{--bg:#0f1117;--card:#1a1d27;--line:#2a2e3d;--fg:#dde1ea;--dim:#8b91a3;--acc:#4f8cff;--bad:#f2877e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);min-height:100vh;display:flex;align-items:center;justify-content:center;
+font:15px/1.6 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+form{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:26px;width:min(380px,92vw)}
+h1{font-size:20px;margin:0 0 4px}
+p{color:var(--dim);font-size:13px;margin:0 0 14px}
+input{background:#0d0f16;border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:8px 10px;width:100%}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:9px 18px;cursor:pointer;width:100%;margin-top:14px}
+.err{color:var(--bad);border:1px solid var(--bad);border-radius:6px;padding:6px 10px;margin-bottom:12px;font-size:13px}
+</style></head>
+<body>
+<form method="post" action="/login">
+  <h1>{{ title }}</h1>
+  <p>{{ t('login.help') }}</p>
+  {% if err %}<div class="err">{{ err }}</div>{% endif %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <input type="password" name="token" placeholder="{{ t('login.placeholder') }}" autocomplete="current-password" autofocus required>
+  <button type="submit">{{ t('login.submit') }}</button>
+</form>
+</body></html>

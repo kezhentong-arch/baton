@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% block title %}{{ d.title }} · {{ title }}{% endblock %}{% block content %}
+{% include "board/_style.html" %}
+{%- set nxt = root ~ '/version?repo=' ~ d.repo ~ '&number=' ~ d.number %}
+<div class="bd">
+<p><a href="{{ root }}">{{ t('gp.back_practice') if practice else t('gp.back_board') }}</a></p>
+<div class="bd-head"><h2>{{ t('ver.title', name=d.title) }}</h2><span class="bd-dim">{{ t('vp.milestone', repo=d.repo, number=d.number) }}</span>
+  {% if d.m %}<a href="https://github.com/{{ d.repo }}/milestone/{{ d.number }}" target="_blank" rel="noopener">{{ t('vp.on_github') }}</a>{% endif %}</div>
+{% if err %}<div class="bd-msg bad">{{ err }}</div>{% endif %}{% if ok %}<div class="bd-msg good">{{ ok }}</div>{% endif %}
+{% if not d.m %}<div class="bd-msg warn">{{ t('vp.not_synced') }}</div>{% endif %}
+<table>
+<tr><th>{{ t('vp.on_board') }}</th><td>{% if d.vt %}{{ t('yes') }}{% if d.done_text %}{{ t('vp.done_sep') }}<span style="color:var(--ok)">{{ t('vp.done_at', time=d.done_text, tz=tz) }}</span>{% endif %}{% else %}{{ t('no') }}{% endif %}</td></tr>
+<tr><th>{{ t('vp.plan') }}</th><td>{{ d.vt.baseline if d.vt and d.vt.baseline else t('due.unset') }} / {{ d.vt.latest if d.vt and d.vt.latest else t('due.unset') }}</td></tr>
+<tr><th>{{ t('vp.gh_due') }}</th><td>{{ d.gh_due or t('vp.gh_due_empty') }}</td></tr>
+<tr><th>{{ t('blk.late') }}</th><td>{% if d.late %}<span style="color:var(--bad)">{{ t('vp.late', late=d.late) }}</span>{% else %}{{ t('none') }}{% endif %}</td></tr>
+</table>
+{#- 这版做了什么：像应用商店的 What's new，汇总挂在这个版本下已完成目标的「做了什么」 -#}
+<h3>{{ t('vp.whats_new') }}</h3>
+{% if d.whats_new %}<ul class="bd-whats">{% for g in d.whats_new %}<li><a href="{{ root }}/goal/{{ g.id }}">{{ g.gnum }} {{ g.title }}</a>{% if g.done_what %}<div class="bd-what-t">{{ g.done_what|linkify }}</div>{% endif %}</li>{% endfor %}</ul>
+{% else %}<p class="bd-dim">{{ t('vp.whats_new_empty') }}</p>{% endif %}
+<h3>{{ t('vp.spans', tz=tz) }}</h3>
+{% if d.spans %}<table>{% for st, a, c, n in d.spans %}<tr><td>{{ st }}</td><td>{{ t('range', start=a, end=c) }}</td><td>{{ n }}</td></tr>{% endfor %}</table>{% else %}<p class="bd-dim">{{ t('vp.spans_empty') }}</p>{% endif %}
+<h3>{{ t('vp.goals') }}</h3>
+{% if d.goals %}<ul>{% for g in d.goals %}<li><span class="bd-dim">{{ g.gnum }}</span> <a href="{{ root }}/goal/{{ g.id }}">{{ g.title }}</a>{{ t('paren', text=people.get(g.owner, t('person.unassigned'))) }}<span class="bd-tag{{ ' bd-tag-done' if g.status == 'done' }}" style="margin-left:6px">{{ d.goal_status[g.id] }}</span></li>{% endfor %}</ul>{% else %}<p class="bd-dim">{{ t('none_full') }}</p>{% endif %}
+<h3>{{ t('vp.moved_in') }}</h3>
+{% if d.moved_in %}<table>{% for mv in d.moved_in %}<tr><td>#{{ mv.number }} {{ mv.title }}</td><td>{{ t('vp.moved_from', src=mv.src) }}</td><td>{{ mv.at }}{{ tz }}</td></tr>{% endfor %}</table>{% else %}<p class="bd-dim">{{ t('none_full') }}</p>{% endif %}
+<h3>{{ t('vp.moved_out') }}</h3>
+{% if d.moved_out %}<table>{% for mv in d.moved_out %}<tr><td>#{{ mv.number }} {{ mv.title }}</td><td>{{ t('vp.moved_to', dst=mv.dst) if mv.dst else t('vp.removed') }}</td><td>{{ mv.at }}{{ tz }}</td></tr>{% endfor %}</table>{% else %}<p class="bd-dim">{{ t('none_full') }}</p>{% endif %}
+<details class="bd-manual"><summary>{{ t('vp.manual') }}</summary>
+{% if not d.vt %}<form method="post" action="{{ root }}/act"><b>{{ t('vp.track') }}</b><input type="hidden" name="action" value="track_version"><input type="hidden" name="ref" value="{{ d.ref }}"><input type="hidden" name="next" value="{{ nxt }}"><button type="submit">{{ t('vp.track') }}</button></form>{% endif %}
+{% if d.vt and is_team_owner %}<form method="post" action="{{ root }}/act"><b>{{ t('vp.plan_date') }}</b><input type="hidden" name="action" value="plan_version"><input type="hidden" name="ref" value="{{ d.ref }}"><input type="hidden" name="next" value="{{ nxt }}"><input name="due" required placeholder="{{ t('gp.due_placeholder', tz='') }}" style="width:230px"><button type="submit">{{ t('gp.save') }}</button></form>{% endif %}
+{% if d.vt and not d.vt.done_at %}<form method="post" action="{{ root }}/act"><b>{{ t('vp.complete') }}</b><input type="hidden" name="action" value="complete_version"><input type="hidden" name="ref" value="{{ d.ref }}"><input type="hidden" name="next" value="{{ nxt }}"><button type="submit">{{ t('gp.complete_btn') }}</button></form>{% endif %}
+</details>
+<details class="bd-fold-sec"><summary>{{ t('vp.history', n=d.history|length) }}</summary>
+<table>{% for h in d.history %}<tr class="{{ 'bd-voided' if h.voided }}"><td>#{{ h.id }}</td><td>{{ h.when }}{{ tz }}</td><td>{{ h.who }}</td><td>{{ h.text }}{% if h.voided %} <span class="bd-tag">{{ t('gp.voided', reason=h.void_reason) }}</span>{% endif %}</td></tr>{% endfor %}</table></details>
+</div>
+{% endblock %}

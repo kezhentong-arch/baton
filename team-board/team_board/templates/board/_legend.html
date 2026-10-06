@@ -1,0 +1,14 @@
+<div class="bd-legend">
+  {% for s in stages %}<span><i style="background:var(--st{{ loop.index0 }})"></i>{{ s }}</span>{% endfor %}
+  <span><i class="bd-lg-pause"></i>{{ t('lg.pause') }}</span>
+  <span><i style="background:var(--ver)"></i>{{ t('lg.no_stages') }}</span>
+  <span><i class="bd-lg-mark"></i>{{ t('lg.marks') }}</span>
+  <span><i style="height:3px;background:var(--ver)"></i>{{ t('lg.life') }}</span>
+  <span><i class="bd-lg-future"></i>{{ t('lg.future') }}</span>
+  <span style="color:var(--bad)">{{ t('lg.late') }}</span>
+  <span><i class="bd-lg-done"></i>{{ t('lg.done') }}</span>
+  {% if github_on %}<span><i style="width:0;height:12px;border:1px solid var(--acc);border-radius:9px;padding:0 8px"></i>{{ t('lg.version') }}</span>{% endif %}
+  <span>{{ t('lg.helper') }}</span>
+  <span>{{ t('lg.numbers') }}</span>
+  <span><i style="background:rgba(255,255,255,.12)"></i>{{ t('lg.family') }}</span>
+</div>

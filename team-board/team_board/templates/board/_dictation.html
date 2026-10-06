@@ -1,0 +1,68 @@
+{#- 口述录入：用口述 / 手写把事情讲清楚，交给 AI 录入，而不是填表。
+    需要：dict_goal_id（None=不针对某个目标）、dict_goal_title、dict_notes。 -#}
+<div class="bd-card">
+  {#- 框里先写明怎么用、谁能录什么（用的人要在框里就看到介绍和权限）。
+      规则本身在看板后台把关（actions.py），这里只是说给人看。 -#}
+  <div class="bd-dim bd-dict-help">
+    <div><b style="font-size:13px">{{ t('dict.how') }}</b>{{ t('dict.how_text') }}</div>
+    <div><b style="font-size:13px">{{ t('dict.can') }}</b>{{ t('dict.can_owner') if is_team_owner else t('dict.can_member') }}</div>
+  </div>
+  <textarea id="bd-note" rows="3" maxlength="4000" placeholder="{{ t('dict.placeholder_goal', title=dict_goal_title) if dict_goal_id else t('dict.placeholder') }}&#10;{{ t('dict.placeholder_tail') }}"></textarea>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" id="bd-note-save" style="width:auto">{{ t('dict.save') }}</button><span id="bd-note-msg" class="bd-dim"></span></div>
+  <textarea id="bd-note-fallback" rows="5" style="display:none" readonly></textarea>
+  {%- macro note_item(n, gid) %}
+    <li><span class="bd-tag">{{ t('dict.done') if n.done else t('dict.waiting') }}</span><span class="bd-dim">#{{ n.id }} · {{ n.who }} · {{ n.at }}{{ tz }}{% if n.goal_id and not gid %} · {{ t('dict.about') }}<a href="{{ root }}/goal/{{ n.goal_id }}">{{ n.goal_num }} {{ n.goal_title }}</a>{% endif %}</span>
+      {% if not n.done %}<button type="button" class="bd-note-copy" data-id="{{ n.id }}" data-text="{{ n.text }}" data-goal="{{ n.goal_num }}" data-goal-title="{{ n.goal_title }}" style="width:auto;margin-left:8px;padding:1px 8px">{{ t('dict.copy') }}</button>{% endif %}
+      <div class="txt">{{ n.text }}</div>
+      {% if n.done %}<div class="bd-dim">{{ t('dict.resolved', time=n.done_at, summary=n.summary) }}</div>{% endif %}</li>
+  {%- endmacro %}
+  {%- set waiting = dict_notes|rejectattr('done')|list %}{% set done = dict_notes|selectattr('done')|list %}
+  {% if waiting %}<ul class="bd-notes">{% for n in waiting %}{{ note_item(n, dict_goal_id) }}{% endfor %}</ul>{% endif %}
+  {% if done %}<details class="bd-fold-sec"><summary>{{ t('dict.done_count', n=done|length) }}</summary><ul class="bd-notes">{% for n in done %}{{ note_item(n, dict_goal_id) }}{% endfor %}</ul></details>{% endif %}
+</div>
+<script>
+(function () {
+  var GOAL = {{ (dict_goal_id or 0)|tojson }}, GOAL_NUM = {{ (dict_goal_num or "")|tojson }}, GOAL_TITLE = {{ (dict_goal_title or "")|tojson }};
+  var PRACTICE = {{ (practice or false)|tojson }};
+  var T = {{ js_strings('jsd.')|tojson }};
+  function fill(s, vars) { return s.replace(/\{(\w+)\}/g, function (_, k) { return vars[k] === undefined ? "" : vars[k]; }); }
+  {# 复制出去的是一段完整的话：AI 拿到就知道用看板 MCP 录入、缺信息先问、录完标记已录入。 #}
+  {# 练手看板：这段话要说清是练手，AI 才会全程走练手看板（工具带 practice=true），不碰正式看板 #}
+  function prompt(id, text, goalNum, goalTitle) {
+    var about = goalNum ? fill(T["jsd.about"], {num: goalNum, title: goalTitle}) : "";
+    return fill(PRACTICE ? T["jsd.prompt_practice"] : T["jsd.prompt"], {id: id, about: about}) + "\n\n" + text;
+  }
+  var msg = document.getElementById("bd-note-msg");
+  function copy(text, done) {
+    var fallback = function () {
+      var box = document.getElementById("bd-note-fallback");
+      box.style.display = "block"; box.value = text; box.focus(); box.select();
+      msg.textContent = T["jsd.copy_blocked"];
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { msg.textContent = done; }, fallback);
+    } else { fallback(); }
+  }
+  document.getElementById("bd-note-save").addEventListener("click", function () {
+    var text = document.getElementById("bd-note").value.trim();
+    if (!text) { msg.textContent = T["jsd.empty"]; return; }
+    var params = {text: text};
+    if (GOAL) { params.goal_id = GOAL; }
+    fetch({{ api_root|tojson }} + "/act", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({action: "add_note", params: params})})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { msg.textContent = fill(T["jsd.save_failed"], {error: d.error}); return; }
+        copy(prompt(d.event_ids[0], text, GOAL_NUM, GOAL_TITLE), fill(T["jsd.saved"], {id: d.event_ids[0]}));
+        document.getElementById("bd-note").value = "";
+      })
+      .catch(function (e) { msg.textContent = fill(T["jsd.save_failed"], {error: e}); });
+  });
+  document.querySelectorAll(".bd-note-copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      copy(prompt(btn.dataset.id, btn.dataset.text, btn.dataset.goal, btn.dataset.goalTitle),
+           fill(T["jsd.copied"], {id: btn.dataset.id}));
+    });
+  });
+})();
+</script>

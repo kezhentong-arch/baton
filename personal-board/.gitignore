@@ -1,0 +1,18 @@
+# Your board lives in the data directory (~/.local/share/personal-board/ by default), never in the repository.
+# These rules keep it out even if the data directory is pointed inside the checkout.
+config.json
+auth.json
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.pid
+*.log
+backups/
+.devdata/
+.data/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.DS_Store

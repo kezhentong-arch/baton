@@ -1,0 +1,18 @@
+[project]
+name = "team-board"
+version = "1.0.0"
+description = "A goal timeline for a small team: who owns what, how long each stage took, where it is stuck. Dictate to your AI; it records via MCP."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

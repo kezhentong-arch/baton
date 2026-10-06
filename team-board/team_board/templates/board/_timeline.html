@@ -1,0 +1,306 @@
+{#- 时间线是一整条，盖住所有目标（缩放只决定一屏看多长，内容在哪一档都是全的；左右拖动看别的时间段）。
+    位置是整条宽度的百分比；整条有多宽、拖到哪、折叠，都在浏览器里算，不刷新页面。 -#}
+{%- set tl = v.timeline -%}
+<div class="bd-tl zoom-{{ v.zoom }}" id="bd-tl" data-days="{{ tl.days }}" data-start="{{ tl.start }}" data-zoom="{{ v.zoom }}" data-person="{{ v.person }}"
+     data-screens="{{ v.screens|tojson|forceescape }}" data-anchors="{{ v.anchors|tojson|forceescape }}">
+  <div class="bd-row bd-axis"><div class="bd-lbl"></div><div class="bd-chart">
+    {%- for k in tl.ticks %}<span class="bd-tick{{ ' mon' if k.monday }}" style="left:{{ k.x }}%">{{ k.day }}<em> {{ k.weekday }}</em></span>{% endfor %}
+    {%- for k in tl.hours %}<span class="bd-htick" style="left:{{ k.x }}%">{{ k.label }}</span>{% endfor %}
+    {%- if tl.today_x is not none %}<span class="bd-today-label" style="left:{{ tl.today_x }}%">{{ t('tl.today') }}</span>{% endif %}
+  </div></div>
+  <div class="bd-tl-body">
+    <div class="bd-grid" aria-hidden="true">
+      {%- for k in tl.ticks %}<i class="{{ 'mon' if k.monday else 'day' }}" style="left:{{ k.x }}%"></i>{% endfor %}
+      {%- for k in tl.hours %}<i class="hour" style="left:{{ k.x }}%"></i>{% endfor %}
+      {%- if tl.today_x is not none %}<i class="bd-todayline" style="left:{{ tl.today_x }}%"></i>{% endif %}
+    </div>
+    {%- for band in tl.bands %}
+    <section class="bd-band{{ ' bd-sample' if band.sample }}"{% if band.color %} style="--lc:{{ band.color }}"{% endif %}>
+      <div class="bd-row bd-linerow" data-anc="">
+        <div class="bd-lbl">{% if band.fold_key %}<button type="button" class="bd-fold" data-key="{{ band.fold_key }}">▾</button>{% else %}<span class="bd-fold-sp"></span>{% endif %}<b>{% if band.mark %}<span class="bd-lnum">{{ band.mark }}</span>{% endif %}{{ band.line }}</b><span class="bd-notes"><span class="bd-hidden-note"></span><span class="bd-out-note"></span><span class="bd-fam-note"></span>{% if band.note %}<span class="bd-dim bd-bandnote">{{ band.note }}</span>{% endif %}</span></div>
+        <div class="bd-chart"></div>
+      </div>
+      {%- for r in band.rows %}
+      <div class="bd-row bd-item{{ ' bd-verrow' if r.kind == 'version' }}{{ ' bd-top' if r.anc|length == 1 else ' bd-child' }}{{ ' bd-fam bd-fam' ~ r.fam_tint if r.fam }}{% if v.person %}{{ ' bd-match' if r.match else ' bd-path' }}{% endif %}{{ ' bd-ended' if r.ended }}" data-anc="{{ r.anc|join(' ') }}" data-span="{{ r.span[0] }} {{ r.span[1] }}"{% if r.ended %} data-ended="{{ r.ended }}"{% endif %}{% if r.fam %} data-fam="{{ r.fam }}"{% endif %} data-owner="{{ r.owner_key }}" data-people="{% for k, n in r.people %}{{ k }}:{{ n }}{{ ' ' if not loop.last }}{% endfor %}" style="min-height:{{ r.h }}px">
+        <div class="bd-lbl" style="padding-left:{{ 6 + r.depth * 18 }}px">{% if r.fold_key %}<button type="button" class="bd-fold" data-key="{{ r.fold_key }}">▾</button>{% else %}<span class="bd-fold-sp"></span>{% endif %}
+          <div class="bd-lbl-text"><div class="bd-lbl-title">{% if r.gid %}<span class="bd-gid">{{ r.gid }}{% if r.source %}<span class="bd-src" title="{{ t('tl.source_tip') }}"> · {{ r.source }}</span>{% endif %}</span>{% endif %}<a href="{{ r.href }}" title="{{ r.full_title }}">{{ r.title }}</a>{% if r.owner %}<span class="bd-who{{ ' bd-me' if r.owner_key == who.person }}"><i style="background:var(--p-{{ r.owner_key }})"></i>{{ r.owner }}</span>{% if r.others %}<span class="bd-others" title="{{ t('tl.others_tip') }}{% for k, n in r.others %}{{ n }}{{ t('sep') if not loop.last }}{% endfor %}"><em>+</em>{% for k, n in r.others %}<span class="bd-who{{ ' bd-me' if k == who.person }}"><i style="background:var(--p-{{ k }})"></i>{{ n }}</span>{% endfor %}</span>{% endif %}{% elif r.kind == 'version' %}{% for k, n in r.people %}<span class="bd-who" title="{{ t('tl.version_owners_tip') }}"><i style="background:var(--p-{{ k }})"></i>{{ n }}</span>{% endfor %}{% endif %}{% if r.sample %}<span class="bd-sampletag">{{ t('sample.tag') }}</span>{% endif %}{% if r.version_name %}<a class="bd-vn" href="{{ r.version_href }}" title="{{ t('ver.title', name=r.version_name) }}">{{ r.version_name }}</a>{% endif %}</div>
+            {#- 折叠 / 悬停的提示放在第二行（挤在名字那行会把名字挤没、还溢出到图里），放不下就省略号、悬停看全文 -#}
+            <div class="bd-info">{{ r.start_text }} · {{ r.plan_text }}{% if r.late %} · <span class="bd-late">{{ t('tl.late', late=r.late) }}</span>{% endif %}{% if r.ended_text %} · <span class="bd-{{ r.ended }}-text">{{ r.ended_text }}</span>{% endif %}{% if r.belongs %} · <span class="bd-belongs">{{ r.belongs }}</span>{% endif %}{% if r.elsewhere %} · {{ r.elsewhere }}{% endif %}<span class="bd-hidden-note"></span><span class="bd-fam-note"></span></div>
+            {#- 版本行：这次发布装着哪些目标，一行一个、点一下进那个目标（只挂一个目标的版本不成行，成行的要看得出装了什么） -#}
+            {%- if r.carried %}<div class="bd-carried" title="{{ t('tl.carried_tip') }}{% for gn, ttl, _h in r.carried %}{{ gn }} {{ ttl }}{{ t('sep') if not loop.last }}{% endfor %}">{% for gn, ttl, h in r.carried %}<div>{{ t('tl.carries') }}<a href="{{ h }}"><span class="bd-gid">{{ gn }}</span> {{ ttl }}</a></div>{% endfor %}</div>{% endif %}</div></div>
+        <div class="bd-chart">
+          {%- for p in r.pieces %}
+            {%- if p.lane == -1 %}<div class="bd-pause" style="left:{{ p.x }}%;width:{{ p.w }}%" title="{{ p.title }}" data-label="{{ p.label }}">{{ p.label }}</div>
+            {%- elif p.future %}<i class="bd-future" style="left:{{ p.x }}%;width:{{ p.w }}%;top:{{ (16 + (r.h - 22 - r.bar_h) / 2 if r.kind == 'version' else 16 + p.lane * (r.bar_h + 3)) + r.bar_h / 2 - 1 }}px;border-color:{{ p.fill }}" title="{{ p.title }}"></i>
+            {%- else %}<div class="bd-seg{{ ' bd-plain' if p.fill == 'var(--ver)' }}" style="left:{{ p.x }}%;width:{{ p.w }}%;top:{{ 16 + (r.h - 22 - r.bar_h) / 2 if r.kind == 'version' else 16 + p.lane * (r.bar_h + 3) }}px;height:{{ r.bar_h }}px;line-height:{{ r.bar_h }}px;background:{{ p.fill }}{{ ';font-size:11px' if r.bar_h < 20 }}" title="{{ p.title }}" data-label="{{ p.label }}">{{ p.label }}</div>{% endif %}
+          {%- endfor %}
+          {%- if r.life %}<i class="bd-life" style="left:{{ r.life[0] }}%;width:{{ r.life[1] }}%" title="{{ t('tl.life_tip') }}"></i>{% endif %}
+          {%- if r.life_future %}<i class="bd-life bd-life-future" style="left:{{ r.life_future[0] }}%;width:{{ r.life_future[1] }}%" title="{{ t('tl.life_future_tip') }}"></i>{% endif %}
+          {%- if r.overflow %}<i class="bd-over" style="left:{{ r.overflow[0] }}%;width:{{ r.overflow[1] }}%" title="{{ t('tl.over_tip') }}"></i>{% if r.late %}<span class="bd-late-label" style="left:{{ r.overflow[0] + r.overflow[1] }}%">{{ t('tl.late', late=r.late) }}</span>{% endif %}{% endif %}
+          {%- if r.start_x is not none %}<span class="bd-start-label" style="left:{{ r.start_x }}%">{{ r.start_text }}</span>{% endif %}
+          {%- if r.ended_x is not none %}<i class="bd-end bd-end-{{ r.ended }}" style="left:{{ r.ended_x }}%" title="{{ r.ended_text }}">{{ '✓' if r.ended == 'done' else '✕' }}</i>{% endif %}
+          {%- for m in r.marks %}<i class="bd-mark{{ ' replan' if m.replan }}" style="left:{{ m.x }}%" title="{{ m.label }}"></i><span class="bd-mark-label{{ ' flip' if m.flip }}" style="left:{{ m.x }}%">{{ m.label }}</span>{% endfor %}
+        </div>
+      </div>
+      {%- endfor %}
+    </section>
+    {%- endfor %}
+  </div>
+</div>
+<script>
+(function () {
+  var tl = document.getElementById("bd-tl"), sc = tl.parentNode;
+  var days = +tl.dataset.days, screens = JSON.parse(tl.dataset.screens), anchors = JSON.parse(tl.dataset.anchors);
+  var zoom = tl.dataset.zoom, LW = 360;
+  var T = {{ js_strings('jst.')|tojson }};
+  function fill(s, vars) { return s.replace(/\{(\w+)\}/g, function (_, k) { return vars[k] === undefined ? "" : vars[k]; }); }
+  var rows = Array.prototype.slice.call(tl.querySelectorAll(".bd-row[data-anc]"));
+  var KEY = "bd-fold", folded;
+  try { folded = new Set(JSON.parse(localStorage.getItem(KEY) || "[]")); } catch (e) { folded = new Set(); }
+
+  {# ---- 窗口即筛选：已完成 / 已放弃的事只在时间线拖到它那段时才显示， #}
+  {#      做完的事不会在首页无限堆积；收起不等于删，详情页、版本页、留痕都在。「连已结束的都显示」可以关掉这个行为。 #}
+  {#      进行中的事也只从立项起出现——拖到过去，那时还没立项的不列；开关勾上同样全显示 ---- #}
+  var SHOWALL = "bd-showall", showAll = false;
+  try { showAll = localStorage.getItem(SHOWALL) === "1"; } catch (e) {}
+  var showAllBox = document.getElementById("bd-showall");
+  if (showAllBox) {
+    showAllBox.checked = showAll;
+    showAllBox.addEventListener("change", function () {
+      showAll = showAllBox.checked;
+      try { localStorage.setItem(SHOWALL, showAll ? "1" : "0"); } catch (e) {}
+      apply();
+    });
+  }
+  function windowPct() { var w = width(); return [sc.scrollLeft / w * 100, (sc.scrollLeft + viewW()) / w * 100]; }
+  function outOfWindow(r, win) {
+    if (showAll || !r.dataset.span) { return false; }
+    var sp = r.dataset.span.split(" ");
+    if (!r.dataset.ended) { return +sp[0] > win[1]; }      {# 进行中：立项之后才出现，往后一直在 #}
+    return +sp[1] < win[0] || +sp[0] > win[1];
+  }
+  var days0 = +tl.dataset.days, start0 = tl.dataset.start;
+  function dayLabel(pct) {
+    var d = new Date(start0 + "T00:00:00");
+    d.setDate(d.getDate() + Math.max(0, Math.floor(pct / 100 * days0)));
+    return (d.getMonth() + 1 < 10 ? "0" : "") + (d.getMonth() + 1) + "-" + (d.getDate() < 10 ? "0" : "") + d.getDate();
+  }
+  var toast = document.createElement("div"); toast.className = "bd-toast"; toast.hidden = true; document.body.appendChild(toast);
+  var toastT = null;
+  function notice(msg) {
+    var axis = tl.querySelector(".bd-axis");
+    if (axis) { toast.style.top = Math.round(axis.getBoundingClientRect().bottom + 12) + "px"; }
+    toast.textContent = msg; toast.hidden = false; toast.classList.remove("show"); void toast.offsetWidth; toast.classList.add("show");
+    clearTimeout(toastT); toastT = setTimeout(function () { toast.classList.remove("show"); setTimeout(function () { toast.hidden = true; }, 250); }, 2600);
+  }
+  var lastOut = null;
+
+  {# ---- 缩放与拖动：一屏看 screens[zoom] 天，整条按比例放宽 ---- #}
+  function viewW() { return Math.max(sc.clientWidth - LW, 300); }
+  function width() { return viewW() * days / screens[zoom]; }
+  function layout() { tl.style.setProperty("--cw", width() + "px"); }
+  function goTo(pct) { sc.scrollLeft = pct / 100 * width(); }
+  function setZoom(z) {
+    var center = (sc.scrollLeft + viewW() / 2) / width();
+    zoom = z;
+    tl.className = tl.className.replace(/zoom-\S+/, "zoom-" + z);
+    layout();
+    sc.scrollLeft = center * width() - viewW() / 2;
+    document.querySelectorAll("[data-zoom-btn]").forEach(function (b) { b.classList.toggle("on", b.dataset.zoomBtn === z); });
+    document.querySelectorAll(".bd-jump").forEach(function (s) { s.hidden = s.dataset.for !== z; });
+    document.querySelectorAll("[data-keep-zoom]").forEach(function (el) {
+      if (el.tagName === "INPUT") { el.value = z; } else { el.href = el.href.replace(/zoom=[^&]*/, "zoom=" + z); }
+    });
+    try { var u = new URL(location.href); u.searchParams.set("zoom", z); history.replaceState(null, "", u); } catch (e) {}
+    fit();
+  }
+  document.querySelectorAll("[data-zoom-btn]").forEach(function (b) {
+    b.addEventListener("click", function () { setZoom(b.dataset.zoomBtn); });
+  });
+  document.querySelectorAll("[data-move]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var step = +b.dataset.move;
+      if (step === 0) { goTo(anchors[zoom]); } else { sc.scrollBy({left: step * viewW(), behavior: "smooth"}); }
+    });
+  });
+  document.querySelectorAll(".bd-jump").forEach(function (s) {
+    s.addEventListener("change", function () { if (s.value !== "") { goTo(+s.value); } s.value = ""; });
+  });
+
+  {# ---- 今天线滑进名字栏底下就不画（不然往后翻到看不见今天时，今天线会漏画在名字栏里）---- #}
+  {#      名字栏是每行一格 sticky（z-index:3）盖着的，块与块之间的缝、每行顶上的分隔线都不在名字格里， #}
+  {#      z-index:2 的今天线就从这些地方漏成几段蓝虚线和一串 1px 小点。在 CSS 里补盖缝行不通：给名字格往下投影子 #}
+  {#      会把行间分隔线也压掉，改用缝遮挡又剩每条分隔线上的小点——名字栏要盖的地方太碎。 #}
+  {#      所以反过来按滚动位置藏线，名字栏一个像素不动。线的横坐标（从图的起点算，px）小于滚过去的距离 = 有一部分在 #}
+  {#      名字栏底下（名字栏宽 LW、图从 LW 起，两边抵消）。滚动事件里同步算，不等下一帧的 apply()，免得快拖时闪一下。 #}
+  {#      日格线同样会从块底留白透进名字栏，但颜色极淡，不处理。 #}
+  var todayLine = tl.querySelector(".bd-grid i.bd-todayline");
+  function todayVis() {
+    if (!todayLine) { return; }
+    var x = parseFloat(todayLine.style.left) / 100 * width();
+    todayLine.style.visibility = x < sc.scrollLeft ? "hidden" : "";
+  }
+
+  {# ---- 色块里放不下的字不写；开始日期和计划日期挤在一起时，图上只留计划（名称下面一行都有） ---- #}
+  function fit() {
+    todayVis();   {# 缩放、窗口变化、滚动后的 apply() 都会走到这里，线的位置跟着整条宽度变 #}
+    tl.querySelectorAll(".bd-seg, .bd-pause").forEach(function (el) {
+      el.textContent = el.dataset.label || "";
+      if (el.scrollWidth > el.clientWidth + 1) { el.textContent = ""; }
+    });
+    {# 图上方那行字（开始 / 计划 / 延期）挤在一起时，按「计划 > 延期 > 开始」留，名称下面一行三样都有 #}
+    function clash(a, b) {
+      var x = a.getBoundingClientRect(), y = b.getBoundingClientRect();
+      return x.right + 4 > y.left && y.right + 4 > x.left;
+    }
+    tl.querySelectorAll(".bd-chart").forEach(function (c) {
+      var m = c.querySelector(".bd-mark-label"), l = c.querySelector(".bd-late-label"), s = c.querySelector(".bd-start-label");
+      [l, s].forEach(function (el) { if (el) { el.style.visibility = ""; } });
+      if (l && m && clash(l, m)) { l.style.visibility = "hidden"; }
+      if (s && ((m && clash(s, m)) || (l && l.style.visibility !== "hidden" && clash(s, l)))) { s.style.visibility = "hidden"; }
+    });
+  }
+
+  {# ---- 折叠：只在浏览器里藏行，记在本机 ---- #}
+  function under(k) { return rows.filter(function (r) { return (" " + r.dataset.anc + " ").indexOf(" " + k + " ") >= 0; }); }
+  {# 按人筛选时，他的事所在的上层自动展开（只对这次显示生效，不改记住的折叠状态） #}
+  function effective() {
+    if (!tl.dataset.person) { return folded; }
+    var open = new Set();
+    rows.forEach(function (r) {
+      if (r.classList.contains("bd-match")) { r.dataset.anc.split(" ").forEach(function (k) { open.add(k); }); }
+    });
+    return new Set(Array.from(folded).filter(function (k) { return !open.has(k); }));
+  }
+  function apply() {
+    var eff = effective(), win = windowPct(), outNow = [], perBand = new Map();
+    rows.forEach(function (r) {
+      var byFold = !!r.dataset.anc && r.dataset.anc.split(" ").some(function (k) { return eff.has(k); });
+      var byWin = outOfWindow(r, win);
+      r.hidden = byFold || byWin;
+      if (byWin) {
+        outNow.push(r);
+        if (!byFold) { var band = r.closest(".bd-band"); perBand.set(band, (perBand.get(band) || 0) + 1); }
+      }
+    });
+    tl.querySelectorAll(".bd-band").forEach(function (band) {
+      var n = perBand.get(band) || 0, el = band.querySelector(".bd-out-note");
+      if (el) { el.textContent = n ? fill(T["jst.out_of_window"], {n: n}) : ""; }
+    });
+    if (lastOut !== null) {        {# 拖动后行进出：差量提示 #}
+      var was = new Set(lastOut), now = new Set(outNow), appeared = 0, left = 0;
+      lastOut.forEach(function (r) { if (!now.has(r)) { appeared++; } });
+      outNow.forEach(function (r) { if (!was.has(r)) { left++; } });
+      if (appeared || left) {
+        notice(fill(T["jst.moved_to"], {day: dayLabel(win[0])}) + (appeared ? fill(T["jst.appeared"], {n: appeared}) : "")
+          + (appeared && left ? T["jst.comma"] : "") + (left ? fill(T["jst.left"], {n: left}) : ""));
+      }
+    }
+    lastOut = outNow;
+    tl.querySelectorAll(".bd-fold").forEach(function (b) {
+      var on = eff.has(b.dataset.key), row = b.closest(".bd-row");
+      b.textContent = on ? "▸" : "▾";
+      b.title = on ? T["jst.expand"] : T["jst.collapse"];
+      var note = b.parentNode.querySelector(".bd-hidden-note");
+      note.textContent = on ? fill(T["jst.folded"], {n: under(b.dataset.key).length}) : "";
+      var line = note.closest(".bd-info, .bd-notes");
+      if (line) { line.title = line.textContent.trim(); }
+    });
+    fit();
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(Array.from(folded))); } catch (e) {} }
+  {# 展开 / 缩回：线的标题整行都能点；有下层的目标，名称区域除名字链接外都能点（只点三角太小） #}
+  function foldKeyAt(target) {
+    if (target.closest("a")) { return ""; }
+    var b = target.closest(".bd-fold");
+    if (b) { return b.dataset.key; }
+    var line = target.closest(".bd-linerow");
+    if (line) { var lb = line.querySelector(".bd-fold"); return lb ? lb.dataset.key : ""; }
+    var lbl = target.closest(".bd-item .bd-lbl");
+    if (lbl) { var gb = lbl.querySelector(".bd-fold"); return gb ? gb.dataset.key : ""; }
+    return "";
+  }
+  tl.addEventListener("click", function (e) {
+    var key = foldKeyAt(e.target);
+    if (!key) { return; }
+    if (folded.has(key)) { folded.delete(key); } else { folded.add(key); }
+    save(); apply();
+  });
+  document.querySelectorAll("[data-fold-all]").forEach(function (a) {
+    a.addEventListener("click", function () {
+      folded = new Set(a.dataset.foldAll === "lines"
+        ? Array.prototype.map.call(tl.querySelectorAll(".bd-linerow .bd-fold"), function (b) { return b.dataset.key; })
+        : []);
+      save(); apply();
+    });
+  });
+
+  {# ---- 悬停一家一起亮：鼠标放在目标名称上，它的上层、下层整棵树一起亮； #}
+  {#      跨线家族（同一个业务目标拆到几条线）也算一家。同一家的块被折叠藏起来时，点亮收着它的那一行并写「里面还有 N 块」 ---- #}
+  function ownerRowOf(key) {
+    var b = tl.querySelector('.bd-fold[data-key="' + key + '"]');
+    return b ? b.closest(".bd-row") : null;
+  }
+  function familyOf(row) {
+    if (!row) { return new Set(); }
+    var fam = new Set([row]);
+    var mine = row.querySelector(".bd-fold");
+    var key = mine ? mine.dataset.key : "";
+    if (key) { under(key).forEach(function (r) { fam.add(r); }); }               {# 下层 #}
+    (row.dataset.anc || "").split(" ").forEach(function (k) {                   {# 上层（线的开关不算） #}
+      if (k && k.indexOf("G:") === 0) { var r = ownerRowOf(k); if (r) { fam.add(r); } }
+    });
+    if (row.dataset.fam) { rows.forEach(function (x) { if (x.dataset.fam === row.dataset.fam) { fam.add(x); } }); }
+    return fam;
+  }
+  function highlight(row) {
+    var fam = familyOf(row), hiddenIn = {}, eff = effective();
+    var selfKey = row && row.querySelector(".bd-fold") ? row.querySelector(".bd-fold").dataset.key : "";
+    rows.forEach(function (x) {
+      var on = fam.has(x);
+      x.classList.toggle("bd-fam-hi", on);
+      if (on && x.hidden) {
+        var keys = x.dataset.anc.split(" ").filter(function (k) { return eff.has(k); });
+        var top = keys[0];                       {# 最外层那个收起来的开关 #}
+        if (top && top !== selfKey) { hiddenIn[top] = (hiddenIn[top] || 0) + 1; }   {# 自己折起来的不重复说（名字旁已写「已折叠 N 项」） #}
+      }
+    });
+    tl.querySelectorAll(".bd-fam-note").forEach(function (n) { n.textContent = ""; });
+    tl.querySelectorAll(".bd-fam-holder").forEach(function (r) { r.classList.remove("bd-fam-holder"); });
+    Object.keys(hiddenIn).forEach(function (key) {
+      var r = ownerRowOf(key);
+      if (!r) { return; }
+      r.classList.add("bd-fam-holder");
+      var n = r.querySelector(".bd-fam-note");
+      if (n) { n.textContent = fill(T["jst.family_inside"], {n: hiddenIn[key]}); }
+    });
+  }
+  tl.addEventListener("mouseover", function (e) {
+    var lbl = e.target.closest(".bd-item .bd-lbl");
+    highlight(lbl ? lbl.closest(".bd-row") : null);
+  });
+  tl.addEventListener("mouseleave", function () { highlight(null); });
+
+  var scrollPending = false;
+  sc.addEventListener("scroll", function () {
+    todayVis();
+    if (scrollPending) { return; }
+    scrollPending = true;
+    requestAnimationFrame(function () { scrollPending = false; apply(); });
+  });
+
+  var pending = false;
+  window.addEventListener("resize", function () {
+    if (pending) { return; }
+    pending = true;
+    requestAnimationFrame(function () {
+      pending = false;
+      var center = (sc.scrollLeft + viewW() / 2) / width();
+      layout(); sc.scrollLeft = center * width() - viewW() / 2; fit();
+    });
+  });
+  layout();
+  goTo(anchors[zoom]);
+  apply();
+})();
+</script>

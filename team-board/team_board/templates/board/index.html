@@ -1,0 +1,83 @@
+{% extends "base.html" %}{% block title %}{{ t('ui.practice_prefix') if practice }}{{ t('ui.sample_prefix') if sample_page }}{{ title }}{% endblock %}{% block content %}
+{% include "board/_style.html" %}
+{#- 关掉浏览器左右滑动返回只在首页（正式 / 练手 / 示例共用本模板）：时间线横着拖，滑过头会把整页退回上一页；
+    详情页、版本页要靠这个手势回首页 #}
+<style>html{overscroll-behavior-x:none}</style>
+{%- set base = root ~ '/sample' if sample_page else root %}
+<div class="bd{{ ' bd-sample' if sample_page }}{{ ' bd-practice' if practice }}">
+{% if practice %}<div class="bd-msg bd-practice-note"><b>{{ t('ui.practice_board') }}</b>{{ t('ui.practice_banner') }}
+  <form method="post" action="/board/practice/reset" style="display:inline;margin-left:10px"><button type="submit" style="width:auto">{{ t('ui.practice_reset') }}</button></form>
+  <a href="/board" style="margin-left:14px">{{ t('ui.back_to_real') }}</a></div>{% endif %}
+{% if sample_page %}<div class="bd-msg warn"><b>{{ t('ui.sample_board') }}</b>{{ t('ui.sample_banner') }}<a href="{{ root }}">{{ t('ui.back_to_real_from_sample') }}</a></div>{% endif %}
+<div class="bd-head">
+  <h2>{{ t('ui.practice_board') if practice else (t('ui.sample_board') if sample_page else title) }}</h2>
+  {#- 练手库是重置那一刻的副本、从不同步：同步提醒在这里没有意义，只说数据停在哪一刻 #}
+  {% if practice %}<span class="bd-dim">{{ t('ui.practice_reset_at', time=practice_reset, tz=tz) if practice_reset else t('ui.practice_reset_unknown') }}{{ t('ui.practice_gh_frozen') if github_on }}</span>
+  {% elif v.fresh.enabled %}<span class="bd-dim">{{ t('ui.gh_as_of', time=v.fresh.last_ok, tz=tz) }}</span>
+  {% if v.fresh.running %}<span class="bd-warn">{{ t('ui.gh_syncing', time=v.fresh.running, tz=tz) }}</span>{% elif v.fresh.stale %}<span class="bd-warn">{{ t('ui.gh_stale') }}</span>{% endif %}
+  {% if v.fresh.last_error %}<span class="bd-warn">{{ t('ui.gh_last_error', error=v.fresh.last_error) }}</span>{% endif %}
+  <form method="post" action="/board/sync"><button type="submit">{{ t('ui.sync_now') }}</button></form>{% endif %}
+  <span class="bd-dim">{{ t('ui.i_am', who=who.label) }}</span>
+</div>
+{% if err %}<div class="bd-msg bad">{{ err }}</div>{% endif %}
+{% if ok %}<div class="bd-msg good">{{ ok }}</div>{% endif %}
+{% for p in v.problems %}<div class="bd-msg bad">{{ p }}</div>{% endfor %}
+{% if v.fresh.warnings and not practice %}<details class="bd-msg warn"><summary>{{ t('ui.gh_incomplete', n=v.fresh.warnings|length) }}</summary><ul>{% for w in v.fresh.warnings %}<li>{{ w }}</li>{% endfor %}</ul></details>{% endif %}
+
+{% if not sample_page %}<h3>{{ t('ui.dictation') }}<span class="bd-dim" style="font-weight:normal">　{{ t('ui.dictation_sub') }}</span></h3>
+{% set dict_goal_id = none %}{% set dict_goal_num = "" %}{% set dict_goal_title = "" %}{% set dict_notes = v.notes %}
+{% include "board/_dictation.html" %}{% endif %}
+
+<h3>{{ t('ui.blockers') }}</h3>
+{% if v.blockers %}
+<ul class="bd-blockers">{% for x in v.blockers %}<li><span class="bd-tag">{{ x.kind }}</span><a href="{{ x.href }}">{{ x.text }}</a></li>{% endfor %}</ul>
+{% else %}<p class="bd-dim">{{ t('ui.no_blockers') }}</p>{% endif %}
+
+<h3>{{ t('ui.timeline') }}</h3>
+<form method="get" action="{{ base }}" class="bd-filters">
+  <input type="hidden" name="zoom" value="{{ v.zoom }}" data-keep-zoom>
+  <select name="person"><option value="">{{ t('ui.everyone') }}</option>{% for k, n in people.items() %}<option value="{{ k }}"{% if k == f_person %} selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+  <select name="line"><option value="">{{ t('ui.all_lines') }}</option>{% for l in lines %}<option{% if l == f_line %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  <label><input type="checkbox" name="active" value="1"{% if f_active == '1' %} checked{% endif %}>{{ t('ui.active_only') }}</label>
+  <button type="submit">{{ t('ui.filter') }}</button>
+  {% if f_person or f_line %}<span class="bd-warn">{{ t('ui.filtering') }}{% if f_person %} {{ t('ui.filtering_person', person=people[f_person]) }}{% endif %}{% if f_line %} {{ f_line }}{% endif %}</span> <a href="{{ base }}?zoom={{ v.zoom }}" data-keep-zoom>{{ t('ui.show_all') }}</a>{% endif %}
+</form>
+<div class="bd-range">
+  <span class="bd-dim">{{ t('ui.one_screen') }}</span>
+  {% for key, z in v.zooms.items() %}<button type="button" class="bd-btn{{ ' on' if key == v.zoom }}" data-zoom-btn="{{ key }}">{{ z[0] }}</button>{% endfor %}
+  <span class="bd-sep"></span>
+  <button type="button" class="bd-btn" data-move="-1">{{ t('ui.prev_screen') }}</button>
+  <button type="button" class="bd-btn" data-move="0">{{ t('ui.back_to_today') }}</button>
+  <button type="button" class="bd-btn" data-move="1">{{ t('ui.next_screen') }}</button>
+  <span class="bd-dim">{{ t('ui.jump_to') }}</span>
+  {% for key in v.zooms %}<select class="bd-jump" data-for="{{ key }}"{% if key != v.zoom %} hidden{% endif %}><option value="">{{ t('ui.pick_day') if key == 'day' else (t('ui.pick_week') if key in ('week', '2week') else (t('ui.pick_month') if key == 'month' else t('ui.pick_quarter'))) }}</option>{% for label, x in v.jumps[key] %}<option value="{{ x }}">{{ label }}</option>{% endfor %}</select>{% endfor %}
+  <span class="bd-sep"></span>
+  <button type="button" class="bd-btn" data-fold-all="lines">{{ t('ui.lines_only') }}</button>
+  <button type="button" class="bd-btn" data-fold-all="open">{{ t('ui.expand_all') }}</button>
+  <label style="display:inline-flex;align-items:center;gap:5px;margin:0;font-size:13px;color:var(--dim)"><input type="checkbox" id="bd-showall" style="width:auto;margin:0">{{ t('ui.show_ended') }}</label>
+  {% if v.has_samples and not sample_page %}<a href="{{ root }}/sample">{{ t('ui.see_sample') }}</a>{% endif %}
+  {% if not practice %}<a href="/board/practice" title="{{ t('nav.practice_tip') }}">{{ t('ui.practice_board') }}</a>{% endif %}
+</div>
+<p class="bd-dim" style="margin:0 0 6px">{{ t('ui.timeline_help') }}</p>
+<div class="bd-scroll">{% include "board/_timeline.html" %}</div>
+{% include "board/_legend.html" %}
+
+<section id="bd-doing">
+<h3>{{ t('ui.doing') }}<span class="bd-dim" style="font-weight:normal">　{{ t('ui.doing_sub') }}</span></h3>
+{%- macro queue_entry(it, with_owner) %}
+  <li style="margin:4px 0"><span class="bd-dim">{{ it.gid }}</span> <a href="{{ root }}/goal/{{ it.id }}">{{ it.title }}</a>{% if with_owner and it.owner %} <span class="bd-who"><i style="background:var(--p-{{ it.owner_key }})"></i>{{ it.owner }}</span>{% endif %}
+    <div class="bd-dim">{{ t('ui.doing_now', stage=it.stage, due=it.due) }}{% if it.late %} · <span style="color:var(--bad)">{{ t('ui.over_by', late=it.late) }}</span>{% endif %}{% if it.role %} · {{ it.role }}{% endif %}</div></li>
+{%- endmacro %}
+<div class="bd-doing">
+  <div class="bd-forms bd-bylines">{% for q in v.by_line %}<div class="bd-card" style="--lc:{{ q.color }}">
+    <b><span class="bd-lnum">{{ q.mark }}</span> {{ q.line }}</b>
+    {% if q.entries %}<ol style="margin:4px 0 0;padding-left:1.2em">{% for it in q.entries %}{{ queue_entry(it, true) }}{% endfor %}</ol>{% else %}<p class="bd-dim">{{ t('ui.nothing_in_progress') }}</p>{% endif %}
+  </div>{% endfor %}</div>
+</div>
+</section>
+
+
+{% if v.weekly %}<h3>{{ t('ui.weekly_docs') }}</h3>
+<ul>{% for d, url in v.weekly %}<li>{{ t('ui.week_of', day=d) }}<a href="{{ url }}" target="_blank" rel="noopener">{{ url }}</a></li>{% endfor %}</ul>{% endif %}
+</div>
+{% endblock %}

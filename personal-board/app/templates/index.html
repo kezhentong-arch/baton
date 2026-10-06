@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="{{HTML_LANG}}" class="no-swipe-back">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{t:app.name}}</title>
+<link rel="stylesheet" href="/static/app.css">
+<script>try{var t=localStorage.getItem("mb.theme");if(t&&t!=="auto")document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+<header class="top">
+  <div class="top-l">
+    <a class="brand" href="{{BASE}}/">{{t:app.name}} <span class="who" id="who"></span></a>
+    <nav class="seg modes"><a href="/" data-mode="">{{t:mode.main}}</a><a href="/sample/" data-mode="sample">{{t:mode.sample}}</a><a href="/practice/" data-mode="practice">{{t:mode.practice}}</a></nav>
+    <span class="badge practice" id="mode-badge" hidden></span>
+  </div>
+  <div class="top-m" id="clock"></div>
+  <div class="top-r">
+    <button class="chip" id="pending-chip" title="{{t:tpl.pending_tip}}" hidden>{{t:tpl.pending_a}}<b id="pending-count">0</b>{{t:tpl.pending_b}}</button>
+    <span class="dim" id="pulled"></span>
+    <button class="chip ghost" id="pull-btn" title="{{t:tpl.pull_tip}}" hidden>{{t:tpl.pull}}</button>
+    <div class="seg" id="theme" title="{{t:tpl.theme_tip}}"><button data-theme="light">{{t:tpl.theme_light}}</button><button data-theme="dark">{{t:tpl.theme_dark}}</button><button data-theme="auto">{{t:tpl.theme_auto}}</button></div>
+    <a class="dim" href="/guide">{{t:tpl.guide}}</a>
+    <span class="ver">v<span id="ver"></span></span>
+  </div>
+</header>
+
+<div class="mode-note" id="mode-note" hidden></div>
+<section class="tl-wrap">
+  <div class="tl-bar">
+    <div class="seg" id="zoom">
+      <button data-zoom="day">{{t:tpl.zoom_day}}</button><button data-zoom="three">{{t:tpl.zoom_three}}</button><button data-zoom="week" class="on">{{t:tpl.zoom_week}}</button>
+    </div>
+    <div class="tl-nav">
+      <button class="chip ghost" id="nav-prev" title="{{t:tpl.earlier}}">‹</button>
+      <button class="chip" id="nav-today">{{t:tpl.back_today}}</button>
+      <button class="chip ghost" id="nav-next" title="{{t:tpl.later}}">›</button>
+      <button type="button" id="nav-date" class="chip ghost" title="{{t:tpl.pick_tip}}">📅</button>
+    </div>
+    <div class="tl-nav"><button class="chip ghost" id="unfold-all">{{t:tpl.unfold_all}}</button><button class="chip ghost" id="fold-all">{{t:tpl.fold_all}}</button></div>
+    <div class="legend" id="legend"></div>
+  </div>
+  <div class="tl" id="tl">
+    <div class="tl-bg" id="tl-bg"><div class="sheet" id="tl-bgsheet"></div></div>
+    <div class="tl-row head" id="tl-headrow"><div class="tl-corner">{{t:tpl.goals}}</div><div class="tl-cell"><div class="sheet" id="tl-head"></div></div></div>
+    <div id="tl-rows"></div>
+  </div>
+  <div class="tl-hint dim">{{t:tpl.hint}}</div>
+</section>
+
+<section class="day">
+  <div class="day-head">
+    <h2 id="day-title"></h2>
+    <div class="seg small" id="order" title="{{t:tpl.order_tip}}"><button data-order="desc">{{t:tpl.order_desc}}</button><button data-order="asc">{{t:tpl.order_asc}}</button></div>
+    <div class="week" id="week"></div>
+  </div>
+  <div id="entries"></div>
+</section>
+
+<section class="two">
+  <div class="card">
+    <h3>{{t:tpl.todos}}</h3>
+    <ul class="todos" id="todos"></ul>
+  </div>
+  <div class="card">
+    <h3>{{t:tpl.dictation}}</h3>
+    <div class="dim small">{{t:tpl.dictation_help}}</div>
+    <textarea id="note" rows="3" maxlength="4000" placeholder="{{t:tpl.dictation_ph}}"></textarea>
+    <div class="row"><button id="note-save">{{t:tpl.dictation_save}}</button><span class="dim" id="note-msg"></span></div>
+    <textarea id="note-fallback" rows="4" hidden readonly></textarea>
+    <ul class="notes" id="notes"></ul>
+  </div>
+</section>
+
+{{BOOT}}
+<script>window.__STATE__ = {{STATE_JSON}}; window.__BASE__ = "{{BASE}}"; window.__MODE__ = "{{MODE}}";</script>
+<script src="/static/calendar.js"></script>
+<script src="/static/timeline.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

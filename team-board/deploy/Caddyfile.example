@@ -1,0 +1,16 @@
+# Reverse proxy example (Caddy). Caddy obtains and renews the HTTPS certificate by itself.
+# Replace board.example.com with your own domain and point its DNS record at this server.
+#
+# Team Board itself listens on 127.0.0.1:10890 (config: host "127.0.0.1", auth "token").
+# Caddy passes X-Forwarded-Proto, so the login cookie gets the Secure flag over HTTPS.
+board.example.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:10890
+
+	header {
+		# The board is a private tool: keep it out of search engines and other sites' frames.
+		X-Robots-Tag "noindex, nofollow"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+	}
+}

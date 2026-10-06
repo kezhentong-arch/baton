@@ -1,0 +1,84 @@
+{% extends "base.html" %}{% block title %}{{ d.g.title }} · {{ title }}{% endblock %}{% block content %}
+{% include "board/_style.html" %}
+{#- 目标详情只放一眼看懂的摘要；改动靠口述交给 AI，手动表单收进「备用」（把人从填表里解放出来） -#}
+{%- set g = d.g %}{%- set nxt = root ~ '/goal/' ~ g.id %}
+{%- set ended = g.status in ('done', 'abandoned') %}
+{%- macro hidden(action) -%}{% if action %}<input type="hidden" name="action" value="{{ action }}">{% endif %}<input type="hidden" name="goal_id" value="{{ g.id }}"><input type="hidden" name="next" value="{{ nxt }}">{%- endmacro %}
+{%- macro when() -%}<label>{{ t('gp.when', tz=tz) }}<input type="datetime-local" name="occurred_at_local"></label>{%- endmacro %}
+<div class="bd">
+<p><a href="{{ root ~ '/sample' if (g.sample and not practice) else root }}">{{ t('gp.back_practice') if practice else (t('gp.back_sample') if g.sample else t('gp.back_board')) }}</a>{% if d.parent %} · {{ t('gp.split_from_pre') }}<a href="{{ root }}/goal/{{ d.parent.id }}">{{ d.parent.gnum }} {{ d.parent.title }}</a>{% if d.parent.line != g.line %}{{ t('paren', text=d.parent.line) }}{% endif %}{{ t('gp.split_from_post') }}{% endif %}</p>
+<div class="bd-head"><h2><span class="bd-dim" style="font-weight:normal;font-size:18px">{{ g.gnum }}</span> {{ g.title }}</h2>{% if g.source %}
+  <span class="bd-dim" title="{{ t('gp.source_tip') }}">{{ t('gp.source', source=g.source) }}</span>{% endif %}
+  <span class="bd-tag{{ ' bd-tag-done' if g.status == 'done' }}">{{ d.status }}{% if d.ended_at %} {{ d.ended_at }}{% endif %}</span>{% if d.version %}<a class="bd-tag bd-tag-ver" href="{{ d.version.href }}" title="{{ t('gp.version_tip') }}">{{ t('ver.title', name=d.version.name) }}</a>{% endif %}{% if g.long_term %}<span class="bd-tag">{{ t('gp.long_term') }}</span>{% endif %}{% if g.sample %}<span class="bd-tag">{{ t('gp.sample_tag') }}</span>{% endif %}
+  <span class="bd-dim">{{ t('gp.line_owner', line=g.line, owner=d.owner) }}</span></div>
+{#- 目标概要：标题下「做什么」（立项说明）；完成后「做了什么」、放弃的写为什么。只看标题就懂的空着。三处里的网址都能点开，新标签页打开 -#}
+{% if g.note %}<p class="bd-what"><b>{{ t('gp.what') }}</b><span>{{ g.note|linkify }}</span></p>{% endif %}
+{% if err %}<div class="bd-msg bad">{{ err }}</div>{% endif %}{% if ok %}<div class="bd-msg good">{{ ok }}</div>{% endif %}
+<p class="bd-sum">{{ t('gp.since', time=d.since, tz=tz, total=d.total) }} ·
+  {% if g.long_term and not g.latest_due %}{{ t('gp.long_term_no_due') }}{% else %}{{ t('gp.plan', due=d.due_text) }}{% if g.due_changes %}{{ t('gp.plan_was', due=g.baseline_due) }}{% endif %}{% endif %} ·
+  {% if d.delay_text %}<span style="color:var(--bad)">{{ t('ui.over_by', late=d.delay_text) }}{% if d.external %}{{ t('blk.late_external', ext=d.external) }}{% endif %}</span>{% else %}{{ t('gp.not_late') }}{% endif %}</p>
+{% if g.status == 'done' and g.done_what %}<p class="bd-what"><b>{{ t('gp.done_what') }}</b><span>{{ g.done_what|linkify }}</span></p>
+{% elif g.status == 'abandoned' and g.abandon_reason %}<p class="bd-what"><b>{{ t('gp.why_abandoned') }}</b><span>{{ g.abandon_reason|linkify }}</span></p>{% endif %}
+{% if d.pause %}<div class="bd-msg warn">{{ t('gp.paused_since', time=d.pause.since, tz=tz, kind=d.pause.kind) }}{% if d.pause.on %}{{ t('blk.pause_waiting', title=d.pause.on) }}{% endif %}{% if d.pause.note %}{{ t('hist.paused_note', note=d.pause.note) }}{% endif %}{{ t('gp.pause_not_counted') }}</div>{% endif %}
+{% if d.blamed %}<div class="bd-msg bad">{{ t('gp.dragged_pre') }}{% for c in d.blamed %}<a href="{{ root }}/goal/{{ c.id }}">{{ c.title }}</a>{{ t('sep') if not loop.last }}{% endfor %}{{ t('gp.dragged_post') }}</div>{% endif %}
+
+<h3>{{ t('gp.stages') }}</h3>
+{% if d.stages %}
+<div class="bd-stages">{% for s in d.stages %}<span style="background:var(--st{{ s.index }})">{{ s.stage }} {{ s.spent }}{{ t('gp.running') if s.running }}</span>{% endfor %}</div>
+<details class="bd-fold-sec"><summary>{{ t('gp.spans', tz=tz) }}</summary><table>
+{% for st, who_, a, c in d.spans %}<tr><td>{{ st }}</td><td>{{ who_ }}</td><td>{{ t('range', start=a, end=c) }}</td></tr>{% endfor %}</table></details>
+{% else %}<p class="bd-dim">{{ t('gp.no_stages') }}</p>{% endif %}
+
+{% if d.children %}<h3>{{ t('gp.children') }}</h3>
+<table>{% for c in d.children %}<tr><td><span class="bd-dim">{{ c.gid }}</span> <a href="{{ root }}/goal/{{ c.id }}">{{ c.title }}</a>{% if c.line != g.line %} <span class="bd-tag">{{ c.line }}</span>{% endif %}</td><td>{{ c.owner }}</td><td>{{ c.status }}{% if c.now %} · {{ c.now }}{% endif %}</td><td>{{ t('tl.plan', due=c.due) }}</td></tr>{% endfor %}</table>{% endif %}
+
+{% if d.deps %}<h3>{{ t('gp.deps') }}</h3>
+<ul>{% for dep, st, need in d.deps %}<li>{{ t('gp.dep_pre', stage=st) }}<a href="{{ root }}/goal/{{ dep.id }}">{{ dep.gnum }} {{ dep.title }}</a>{{ t('gp.dep_post') }}{% if need %}{{ t('hist.dep_need_by', need=need) }}{% endif %}{{ t('gp.dep_their_plan', due=dep.latest_due or (t('due.long_term') if dep.long_term else t('due.unset'))) }}</li>{% endfor %}</ul>{% endif %}
+
+{% if d.links %}<h3>{{ t('gp.links') }}</h3>
+<ul>{% for l in d.links %}<li>{{ t('gp.subcontract') if l.kind == 'subcontract' }}{% if l.synced %}<a href="{{ l.url }}" target="_blank" rel="noopener">{{ l.ref }} {{ l.title }}</a>
+  <span class="bd-dim">{% if l.state == 'CLOSED' %}{{ t('gp.issue_closed') }}{% elif l.now %}{{ t('gp.issue_now', state=l.now[0], dur=l.now[1]) }}{% endif %}{% if l.wait %} · {{ t('gp.sub_delivered', dur=l.wait[0]) if l.wait[1] else t('gp.sub_waiting', dur=l.wait[0]) }}{% endif %}</span>
+  {% else %}{{ l.ref }} <span class="bd-dim">{{ t('gp.not_synced') }}</span>{% endif %}</li>{% endfor %}</ul>{% endif %}
+
+<h3>{{ t('ui.dictation') }}<span class="bd-dim" style="font-weight:normal">　{{ t('gp.dictation_sub') }}</span></h3>
+{% set dict_goal_id = g.id %}{% set dict_goal_num = g.gnum %}{% set dict_goal_title = g.title %}{% set dict_notes = d.notes %}
+{% include "board/_dictation.html" %}
+
+{% if d.can_edit and not ended %}
+<details class="bd-manual"><summary>{{ t('gp.manual') }}</summary>
+  <form method="post" action="{{ root }}/act">{{ hidden('') }}<b>{{ t('gp.stages') }}</b>
+    <select name="stage">{% for s in stages %}<option{% if s in d.open_stages %} selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+    {{ when() }}
+    <button type="submit" name="action" value="start_stage">{{ t('gp.start') }}</button><button type="submit" name="action" value="end_stage">{{ t('gp.end') }}</button>
+    <span class="bd-dim">{{ t('gp.stages_hint') }}</span></form>
+  <form method="post" action="{{ root }}/act">{{ hidden('change_due') }}<b>{{ t('gp.due') }}</b>
+    <input name="due" required placeholder="{{ t('gp.due_placeholder', tz=tz) }}" style="width:230px"><label>{{ t('gp.why') }}<input name="reason" required maxlength="200"></label><button type="submit">{{ t('gp.save') }}</button></form>
+  {% if g.current_pause %}
+  <form method="post" action="{{ root }}/act">{{ hidden('resume') }}<b>{{ t('gp.resume') }}</b>{{ when() }}<button type="submit">{{ t('gp.resume_btn') }}</button></form>
+  {% else %}
+  <form method="post" action="{{ root }}/act">{{ hidden('pause') }}<b>{{ t('gp.pause') }}</b>
+    <select name="kind">{% for k, n in pause_kinds.items() %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select>
+    <select name="depends_on"><option value="">{{ t('gp.pause_which') }}</option>{% for i, title_ in d.other_goals %}<option value="{{ i }}">{{ title_ }}</option>{% endfor %}</select>
+    <label>{{ t('gp.note') }}<input name="note" maxlength="200"></label>{{ when() }}<button type="submit">{{ t('gp.pause') }}</button></form>
+  {% endif %}
+  <form method="post" action="{{ root }}/act">{{ hidden('complete') }}<b>{{ t('gp.complete') }}</b><label>{{ t('gp.done_what_optional') }}<textarea name="done_what" maxlength="1000" rows="2"></textarea></label>{{ when() }}<button type="submit">{{ t('gp.complete_btn') }}</button><span class="bd-dim">{{ t('gp.complete_hint') }}</span></form>
+  {% if d.is_team_owner %}<form method="post" action="{{ root }}/act">{{ hidden('abandon') }}<b>{{ t('gp.abandon') }}</b><label>{{ t('gp.why') }}<input name="reason" required maxlength="200"></label><button type="submit">{{ t('gp.abandon_btn') }}</button></form>{% endif %}
+</details>
+{% endif %}
+
+{% if d.can_edit and g.status != 'abandoned' %}
+<details class="bd-manual"><summary>{{ t('gp.edit_summary_done') if g.status == 'done' else t('gp.edit_summary') }}</summary>
+  <form method="post" action="{{ root }}/act">{{ hidden('edit_goal') }}
+    <label>{{ t('gp.what') }}<textarea name="note" maxlength="500" rows="2">{{ g.note }}</textarea></label>
+    {% if g.status == 'done' %}<label>{{ t('gp.done_what') }}<textarea name="done_what" maxlength="1000" rows="3">{{ g.done_what }}</textarea></label>{% endif %}
+    <button type="submit">{{ t('gp.save') }}</button><span class="bd-dim">{{ t('gp.edit_hint') }}</span></form>
+</details>
+{% endif %}
+
+<details class="bd-fold-sec"><summary>{{ t('gp.history', n=d.history|length) }}</summary>
+<table>{% for h in d.history %}<tr class="{{ 'bd-voided' if h.voided }}"><td>{{ h.when }}{{ tz }}</td><td>{{ h.who }}</td>
+  <td>{{ h.text }}{% if h.backfill %} <span class="bd-tag">{{ t('gp.backfill') }}</span>{% endif %}{% if h.voided %} <span class="bd-tag">{{ t('gp.voided', reason=h.void_reason) }}</span>{% endif %}</td>
+  <td>{% if h.can_void %}<form method="post" action="{{ root }}/act" class="bd-inline"><input type="hidden" name="action" value="void"><input type="hidden" name="event_id" value="{{ h.id }}"><input type="hidden" name="next" value="{{ nxt }}"><input name="reason" required maxlength="200" placeholder="{{ t('gp.void_why') }}"><button type="submit">{{ t('gp.void') }}</button></form>{% endif %}</td></tr>{% endfor %}</table>
+</details>
+</div>
+{% endblock %}
