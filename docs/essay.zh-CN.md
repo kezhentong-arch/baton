@@ -172,6 +172,6 @@ Claude Code 没问题，人也都很努力。想了很久，我的结论是：�
 - **示例数据**：一个虚构团队的完整看板；还有这两个看板自己从立项做到上线的真实记录，可以打开一条条看。
 
 仓库地址：github.com/kezhentong-arch/baton
-介绍视频：即将上线
+介绍视频：https://www.bilibili.com/video/BV1v5HC6MEBZ
 
 一件事，一个人，用 Claude Code，一棒到底。
