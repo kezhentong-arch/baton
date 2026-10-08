@@ -4,6 +4,8 @@
 
 [English](README.md) · [文章：AI 写得飞快，你的团队为什么还是这么慢？](docs/essay.zh-CN.md) · [介绍视频（B站）](https://www.bilibili.com/video/BV1v5HC6MEBZ)
 
+https://github.com/user-attachments/assets/378e2495-f4b2-43ea-8b1f-a9d204d90376
+
 多数团队做事还像接力赛：一个人写需求，交给下一个人开发，再交给第三个人测试。每交一次棒，就漏一点、等一阵。在「执行」最贵的年代，这笔账是划算的；现在执行大多由 AI 完成，这笔账反过来了。
 
 **一棒到底**是一套给「人人都在用 AI 干活的小团队」的协作方式，外加让它落得了地的两个看板：

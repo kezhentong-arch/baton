@@ -2,7 +2,9 @@
 
 **Run your startup in owner mode: one owner per goal, many AIs, no handoffs.**
 
-[中文说明](README.zh-CN.md) · [The essay: The Handoff Is the Bug](docs/essay.en.md) · Video: _coming soon_
+[中文说明](README.zh-CN.md) · [The essay: The Handoff Is the Bug](docs/essay.en.md)
+
+https://github.com/user-attachments/assets/67ea2b01-ae2e-4aac-b11e-4e9220c51efc
 
 Most teams still work like a relay race: one person writes the spec, hands it to the next to build, who hands it to a third to test. Every handoff drops something, and everyone waits. That trade made sense when execution was the expensive part. With AI doing most of the execution, it no longer does.
 
