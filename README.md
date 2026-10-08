@@ -6,6 +6,8 @@
 
 https://github.com/user-attachments/assets/67ea2b01-ae2e-4aac-b11e-4e9220c51efc
 
+[中文版介绍视频 →](README.zh-CN.md)
+
 Most teams still work like a relay race: one person writes the spec, hands it to the next to build, who hands it to a third to test. Every handoff drops something, and everyone waits. That trade made sense when execution was the expensive part. With AI doing most of the execution, it no longer does.
 
 **Baton** is a way of working for small teams where everyone works with AI, plus the two boards that make it practical:
