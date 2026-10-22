@@ -80,7 +80,7 @@ a.url{color:var(--acc);overflow-wrap:anywhere}a.url:hover{text-decoration:underl
   else kv.push([T('open_stages'), g.open_stages.length ? g.open_stages.map(esc).join(T('sep')) : (g.has_stages ? '—' : T('no_stage'))]);
   kv.push([T('source'), g.source === 'team' ? (g.birth ? T('src_pushed') : T('src_team')) : T('src_local')]);
   if (g.birth) kv.push([T('birth'), esc(g.birth) + (g.birth !== g.gnum ? T('birth_pushed', { gnum: esc(g.gnum), birth: esc(g.birth) }) : '') + T('birth_note')]);
-  kv.push([T('created'), esc(g.created_at_local) + (g.due || g.baseline_due ? ` · ${g.due ? T('plan', { due: esc(g.due) }) : T('plan_unset')}` + (g.baseline_due && g.baseline_due !== g.due ? T('plan_was', { due: esc(g.baseline_due) }) : '') : '')]); /* with the plan cleared, delay is still measured from the original one, so it is written out */
+  kv.push([T('created'), esc(g.created_at_local) + (g.due || g.baseline_due ? ` · ${g.due ? T('plan', { due: esc(g.due) }) : T('plan_unset')}` + (g.baseline_due && g.baseline_due !== g.due ? T('plan_was', { due: esc(g.baseline_due) }) : '') : '')]); /* a replanned goal shows its original plan; with the plan cleared there is no delay, but the original is still written out */
   if (d.parent) kv.push([T('belongs'), `<a href="${B}/goal/${encodeURIComponent(d.parent.gnum)}">${num2(d.parent)} ${esc(d.parent.title)}</a>`]);
   if (d.children.length) kv.push([T('blocks'), d.children.map(c => `<a href="${B}/goal/${encodeURIComponent(c.gnum)}">${num2(c)} ${esc(c.title)}</a>${c.status === 'done' ? T('block_done') : ''}`).join(T('sep'))]);
   $('kv').innerHTML = kv.map(([k, v]) => `<b>${k}</b><span>${v}</span>`).join('');

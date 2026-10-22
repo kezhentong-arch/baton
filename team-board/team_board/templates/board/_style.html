@@ -19,7 +19,7 @@ main{max-width:min(1900px,97vw)}
 .bd-blockers li{padding:5px 0;font-size:15px}
 .bd-tag{display:inline-block;font-size:12px;padding:0 6px;margin-right:8px;border:1px solid var(--line);border-radius:4px;color:var(--dim)}
 .bd-tag-done{border-color:var(--ok);color:var(--ok)}
-a.bd-tag-ver{border-color:var(--acc);color:var(--acc);text-decoration:none}
+.bd-tag-ver{border-color:var(--acc);color:var(--acc);text-decoration:none}
 {# 筛选栏：页壳的全局样式把 select/input 撑成整行，这里收回成一行 #}
 .bd-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0 6px}
 .bd-filters select,.bd-filters input[type=date]{width:auto;display:inline-block;margin:0}
@@ -160,10 +160,11 @@ a.bd-tag-ver{border-color:var(--acc);color:var(--acc);text-decoration:none}
 .bd-over{position:absolute;top:13px;bottom:1px;border:2.5px solid var(--bad);border-radius:5px;box-sizing:border-box}
 .bd-late-label{position:absolute;top:0;transform:translateX(-100%);padding-right:2px;font-size:11px;line-height:13px;font-weight:600;color:var(--bad);white-space:nowrap}
 .bd-mark{position:absolute;top:2px;bottom:2px;border-left:2.5px solid var(--fg)}
-.bd-mark.replan{border-left:2px dashed var(--fg)}
+.bd-mark.orig{border-left:2px dashed var(--dim);opacity:.6}  /* the first plan of a replanned goal: grey dashed, grey label, hidden first when crowded */
 .bd-mark-label,.bd-start-label{position:absolute;top:0;padding-left:5px;font-size:11px;line-height:13px;color:var(--fg);white-space:nowrap;opacity:.85}
 .bd-start-label{color:var(--dim);padding-left:1px}
 .bd-mark-label.flip{transform:translateX(-100%);padding-left:0;padding-right:5px}
+.bd-mark-label.orig{color:var(--dim)}
 .bd-legend i.bd-lg-pause{background:repeating-linear-gradient(45deg,var(--dim) 0 2px,transparent 2px 5px);border:1px solid var(--dim)}
 .bd-legend i.bd-lg-mark{width:0;height:14px;border-left:2.5px solid var(--fg);border-radius:0}
 .bd-dict-help{font-size:13px;line-height:1.55;display:flex;flex-direction:column;gap:3px;margin-bottom:2px}

@@ -12,10 +12,10 @@ from team_board.board.actions import Who
 from team_board.board.github_sync import incomplete, last_success, latest_run, running_since
 from team_board.board.issues import GhData, dwell, last_activity, milestone_moves, subcontract_wait
 from team_board.board.model import (DEFAULT_ZOOM, SUBCONTRACT_WARN_DAYS, SYNC_STALE_MINUTES, ZOOM_DAYS,
-                                    duration_text, gh_due_day, is_team_owner, iso, late_text, lines, pause_kinds,
+                                    duration_text, gh_due_day, is_milestone, is_team_owner, iso, late_text, lines, pause_kinds,
                                     people, person_name, stages, status_label, tz_day, tz_text, zooms)
 from team_board.board.state import (Board, Goal, blamed_children, delay, delay_text, dependency_warnings, fold,
-                                    handoffs, is_stale, pause_days, pause_time, stage_days, stage_spans, stage_time)
+                                    handoffs, is_stale, late_external, pause_days, stage_days, stage_spans, stage_time)
 from team_board.board.store import Event, load_events
 from team_board.board.timeline import (LineGroup, build_timeline, version_carriers, version_done_at, version_href,
                                        version_name, weekdays)
@@ -69,7 +69,7 @@ def blockers(b: Board, gh: GhData, now: datetime, sample: bool = False, root: st
             continue
         late = delay_text(g, now)
         if late:
-            ext = pause_time(g, now)["external"]
+            ext = late_external(g, now)
             out.append(_blocker("late", t("blk.late_text", title=_label(g), late=late)
                                 + (t("blk.late_external", ext=duration_text(ext)) if ext else ""), href, g.id))
         blamed = blamed_children(g, b, now)
@@ -103,8 +103,8 @@ def blockers(b: Board, gh: GhData, now: datetime, sample: bool = False, root: st
         m = gh.milestones.get((repo, int(num)))
         title = m.title if m else ref
         href = version_href(ref, root)
-        if version_done_at(vt, m) is None and vt.baseline:
-            late = late_text(vt.baseline.at, now)
+        if version_done_at(vt, m) is None and vt.latest:   # 版本同目标：从现在的计划算
+            late = late_text(vt.latest.at, now)
             if late:
                 out.append(_blocker("version", t("blk.version_text", title=title, late=late), href))
     return sorted(out, key=lambda x: _BLOCKER_ORDER.index(x.key))
@@ -360,7 +360,8 @@ def build_index(conn: sqlite3.Connection, now: datetime, *, line: str, person: s
         # 版本行放在挂着它的目标所在的线上（不按仓库归线）。挂的目标分在几条线就在几条线各出现一次；
         # 没有任何目标挂的版本才按仓库归线（配置里每个仓库写了归哪条线）。
         # GitHub 里程碑没有负责人：按人筛选时只带出他目标挂着的版本，不然筛谁都有版本行
-        here = {g.version for g in b.goals.values() if g.version and g.line == ln and visible(g)}
+        # 文字版本只当目标行上的牌子，不成版本行
+        here = {g.version for g in b.goals.values() if g.version and is_milestone(g.version) and g.line == ln and visible(g)}
         unattached = {r for r in b.versions if r not in carried and repo_line.get(r.split("#")[0]) == ln}
         # 版本只挂一个目标时不单独成行：那样的版本行只是目标行的复读，目标行上现成的小牌子就够了；
         # 挂两个以上目标、或没挂任何目标的版本才成行，行上列出装了哪些目标
@@ -459,7 +460,7 @@ def build_goal(conn: sqlite3.Connection, b: Board, g: Goal, now: datetime, who: 
                          "now": (stays[-1][0], duration_text(now - stays[-1][1])) if stays and stays[-1][2] is None else None,
                          "wait": _wait_text(subcontract_wait(issue, evs, now)) if link.kind == "subcontract" else None})
         links.append(item)
-    spent, ext = stage_time(g, now), pause_time(g, now)["external"]
+    spent, ext = stage_time(g, now), late_external(g, now)
     return {
         "g": g, "status": status_label(g.status), "owner": person_name(g.owner),
         "due_text": due_text(g),
@@ -508,7 +509,7 @@ def build_version(conn: sqlite3.Connection, b: Board, repo: str, number: int, no
         "ref": ref, "repo": repo, "number": number, "m": m, "vt": vt,
         "title": m.title if m else ref,
         "gh_due": gh_due_day(m.due_on) if m and m.due_on else None,
-        "late": late_text(vt.baseline.at, version_done_at(vt, m) or now) if vt and vt.baseline else "",
+        "late": late_text(vt.latest.at, version_done_at(vt, m) or now) if vt and vt.latest else "",
         "goals": [g for g in b.goals.values() if g.version == ref],
         # 这版做了什么：挂在这个版本下已完成的目标，按完成先后；没写「做了什么」的就是标题本身
         "whats_new": sorted((g for g in b.goals.values() if g.version == ref and g.status == "done"), key=lambda g: g.done_at),

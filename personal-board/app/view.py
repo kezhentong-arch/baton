@@ -112,7 +112,8 @@ def entry_dict(e: sqlite3.Row, goal: sqlite3.Row | None = None, spans: list[dict
     if goal is not None:
         # The summary travels with the entry: a create / complete / edit push at wrap-up takes the current text from here.
         d.update({"gnum": goal["gnum"], "birth": goal["birth"], "goal_title": goal["title"], "line": goal["line"],
-                  "goal_what": goal["what"] or "", "goal_done_what": goal["done_what"] or ""})
+                  "goal_what": goal["what"] or "", "goal_done_what": goal["done_what"] or "",
+                  "goal_version": goal["version_name"] or ""})
     return d
 
 

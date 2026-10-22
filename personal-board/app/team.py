@@ -207,7 +207,7 @@ def pull(conn: sqlite3.Connection, now: datetime) -> dict:
                 parent = by_id.get(g.get("parent_id") or 0, {}).get("gnum")
                 status = g["_status"]
                 due = g.get("latest_due") or g.get("baseline_due") or None
-                baseline = g.get("baseline_due") or None   # the first plan ever set: delay is measured from it, and the team board is the authority
+                baseline = g.get("baseline_due") or None   # the first plan ever set (the team board is the authority): drawn as the grey "originally" line; delay counts from the current plan
                 owner = me if g["id"] in mine else str(g.get("owner") or "")   # a parent kept for context keeps its owner's name
                 approved_at = g.get("approved_at") or ""
                 closed_at = g.get("done_at") or g.get("abandoned_at") or ""
@@ -241,10 +241,14 @@ def pull(conn: sqlite3.Connection, now: datetime) -> dict:
                 _backfill_create(conn, row["id"], row["created_at"], approved_at, now)
                 if baseline and baseline != row["baseline_due"]:   # regardless of unpushed local changes: the baseline is the team board's
                     conn.execute("UPDATE goals SET baseline_due=? WHERE id=?", (baseline, row["id"]))
-                if version_name and version_name != (row["version_name"] or ""):   # the version (milestone) set on the team board is the badge
-                    conn.execute("UPDATE goals SET version_name=? WHERE id=?", (version_name, row["id"]))
                 pending = conn.execute("SELECT COUNT(*) FROM entries WHERE goal_id=? AND sync='pending' AND voided_at IS NULL",
                                        (row["id"],)).fetchone()[0]
+                pending_due = conn.execute("SELECT COUNT(*) FROM entries WHERE goal_id=? AND sync='pending' AND voided_at IS NULL"
+                                           " AND kind='due'", (row["id"],)).fetchone()[0]
+                # The version set on the team board (a milestone's name or plain text) is the badge; not while local changes
+                # are unpushed — a badge just changed here would be put back to the old one by the next pull (as with the summary below).
+                if version_name and version_name != (row["version_name"] or "") and not pending:
+                    conn.execute("UPDATE goals SET version_name=? WHERE id=?", (version_name, row["id"]))
                 _sync_open_stages(conn, row["id"], g, pending, now)
                 if row["gnum"] != g["gnum"]:   # claimed by source / team id and the display number changed: children follow, or they are orphaned
                     conn.execute("UPDATE goals SET parent_gnum=? WHERE parent_gnum=?", (g["gnum"], row["gnum"]))
@@ -257,20 +261,21 @@ def pull(conn: sqlite3.Connection, now: datetime) -> dict:
                     at = (last.get("start") if paused else last.get("end")) or iso(now)
                     _entry(conn, row["id"], "note", t("team.note_paused", text=paused) if paused else t("team.note_resumed"), at, now)
                 if not pending:
-                    # Summary: where it differs the team board wins (not while local changes are unpushed, as with the plan
+                    # Summary: where it differs the team board wins (not while local changes are unpushed, as with the status
                     # below). Whether a field was sent is judged by its key: absent = leave local alone, empty = it was cleared there.
                     for key, col, val in (("note", "what", what), ("done_what", "done_what", done_what)):
                         if key in g and val != (row[col] or ""):
                             conn.execute(f"UPDATE goals SET {col}=? WHERE id=?", (val or None, row["id"]))
-                    # The team board's status / plan overwrite local ones only when nothing local is unpushed.
-                    # A plan may carry an hour: if the team board gives one, it wins; if it gives only a date and the local
-                    # plan is the same day with an hour, the local hour is kept — only a different day overwrites it.
+                if not pending_due:
+                    # The plan is held back only by an unpushed local plan change (local is newer; it aligns once pushed). Other
+                    # unpushed entries (a stage start, say) do not hold it: a plan changed on the team board by someone else
+                    # follows at once. The hour comes along too, or the two boards would measure delay from different moments.
                     local_due = row["due"] or None
-                    timed = bool(due) and len(due) > 10
-                    changed = ((due or None) != local_due) if timed else ((due or None) != (local_due[:10] if local_due else None))
-                    if changed:
+                    if (due or None) != local_due:
                         _entry(conn, row["id"], "due", t("team.due", new=due or t("team.no_due"), old=local_due or t("team.no_due")), iso(now), now)
                         conn.execute("UPDATE goals SET due=? WHERE id=?", (due, row["id"]))
+                if not pending:
+                    # The team board's status overwrites the local one only when nothing local is unpushed.
                     if status != "active" and row["status"] == "active":
                         for st in open_stages(conn, row["id"]):
                             _, end = _span_times(g, st)

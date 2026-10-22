@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from team_board import config
-from team_board.board.model import (FUTURE_TOLERANCE, PAUSE_KEYS, Due, gh_due_day, is_team_owner, lines, parse_day,
+from team_board.board.model import (FUTURE_TOLERANCE, PAUSE_KEYS, Due, gh_due_day, is_milestone, is_team_owner, lines, parse_day,
                                     parse_ts, people, person_name, repos, stages, status_label, tz_note, tz_text)
 from team_board.board.state import Board, Goal, fold
 from team_board.board.store import append_event, load_events, new_goal_id
@@ -251,6 +251,13 @@ def _after_version(vt, occ: datetime) -> None:
         raise ActionError(409, t("err.version_close_after_last", time=tz_text(vt.last_at), tz=tz_note()))
 
 
+def _goal_version(version: str) -> None:
+    """目标挂的版本：GitHub 里程碑「仓库#编号」，或直接写版本名文字。带 # 的一律按里程碑严格校验，
+    写错仓库或编号当场报错，不悄悄当成文字收下。"""
+    if is_milestone(version):
+        _version_ref(version)
+
+
 def _version_ref(ref: str) -> tuple[str, int]:
     if not repos():
         raise ActionError(400, t("err.github_off"))
@@ -291,9 +298,9 @@ def _create(conn, b, params, who, now, occ) -> Result:
                                  me=people()[who.person], letter=my_letter))
     line = p.choice("line", lines(), required=False)
     due, note = p.due("due", required=False), p.text("note", required=False, max_len=500)
-    version = p.text("version", required=False)
+    version = p.text("version", required=False, max_len=40)
     if version:
-        _version_ref(version)
+        _goal_version(version)
     pid = p.integer("parent_id", required=False)
     parent_then, parent = _goal_then(b, pid, occ) if pid is not None else (None, None)
     _may_create(who, parent, owner)
@@ -454,10 +461,10 @@ def _edit_goal(conn, b, params, who, now, occ) -> Result:
         if line == g.line:
             raise ActionError(409, t("err.same_line", line=line))
         payload["line"] = line
-    version = p.text("version", required=False)
+    version = p.text("version", required=False, max_len=40)
     if version:
         if version != "-":
-            _version_ref(version)
+            _goal_version(version)
         payload["version"] = None if version == "-" else version
     if "long_term" in params:
         long_term = p.flag("long_term")

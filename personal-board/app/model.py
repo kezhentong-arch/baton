@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta, timezone
 from app import settings
 from app.i18n import every, t
 
-VERSION = "1.0.0"   # shown top-right on the page; also the HTTP Server header and the User-Agent of team-board pulls
+VERSION = "1.1.0"   # shown top-right on the page; also the HTTP Server header and the User-Agent of team-board pulls
 
 # Birth numbers: the moment a goal is created here it gets "<your letter><sequence>" (e.g. A19). The number
 # never changes and is never reused, even after a reset. Once the goal is pushed to the team board its

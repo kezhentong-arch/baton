@@ -1,6 +1,6 @@
 ---
 name: personal-board
-version: 1.0.0
+version: 1.1.0
 ---
 
 # 个人看板手册 — 把零散的 AI 对话归进主线
@@ -70,17 +70,18 @@ version: 1.0.0
 
    | 个人看板记录 | 团队看板操作 | 带什么 |
    |---|---|---|
-   | `goal_create`（团队线） | `create` | 标题、负责人、线、上层（团队看板上的 id）、`due`（原样带时刻）、`occurred_at`、`source`（出生号，未推清单的 `birth`）、`note`（「做什么」，未推清单的 `goal_what`；空着不带） |
+   | `goal_create`（团队线） | `create` | 标题、负责人、线、上层（团队看板上的 id）、`due`（原样带时刻）、`occurred_at`、`source`（出生号，未推清单的 `birth`）、`note`（「做什么」，未推清单的 `goal_what`；空着不带）、`version`（版本牌，未推清单的 `goal_version`；空着不带） |
    | `stage_start` / `stage_end` | `start_stage` / `end_stage` | 团队看板上的目标 id、`stage`、`occurred_at` |
    | `due` | `change_due` | 目标 id、`due`（原样带时刻）、`reason`（记 due 时就把原因写进 `reason`） |
    | `abandon` | `abandon` | 目标 id、`reason` |
    | `complete` | `complete` | 目标 id、`occurred_at`、`done_what`（未推清单的 `goal_done_what`；空着不带） |
-   | `summary`（已推目标改了做什么 / 做了什么；同一目标只留一条） | `edit_goal` | 目标 id、改「做什么」带 `note`、改「做了什么」带 `done_what`（清空就显式带空字符串） |
+   | `summary`（已推目标改了做什么 / 做了什么 / 版本牌；同一目标只留一条） | `edit_goal` | 目标 id、改「做什么」带 `note`、改「做了什么」带 `done_what`（清空就显式带空字符串）、改「版本牌」带 `version`（取 `goal_version`；清空带 `-`） |
 
    团队看板上的目标 id 从团队看板的现状里用 G 号对回并核实，**不用个人库内部的 goal_id**（两套编号不同）。
 5. 推成功后 `sync_mark`（`entry_ids`、`status=pushed`、`team_ref` 写返回的事件号）；新立项拿到 G 号后 `goal_update gnum=G…`。
    团队看板拒绝就原样转述，那条留在未推，不硬试。
 6. 人说某条不推 → `sync_mark status=skip`，或 `void` 作废重记（作废「完成」不会把目标改回进行中，要改用 `goal_update status=active`）。
+   **改期（`due`）不能标不推**：延期从现在的计划算，两边计划日不一致延期就对不上；记错了的改期用 `void` 作废。团队线上的目标改了期，最好当场就推，不等收尾。
 7. 环节真的切换时，也当场问一句要不要先把这几条推了。
 
 一次收尾由一个对话负责，其他对话照常记录，不同时推同一份清单。个人看板自己不写团队看板，唯一写入口是团队看板的 MCP。

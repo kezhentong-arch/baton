@@ -251,7 +251,7 @@ M: dict[str, tuple[str, str]] = {
     "tl.plan": ("计划 {due}", "Due {due}"),
     "tl.plan_was": ("（原定 {due}）", " (was {due})"),
     "tl.plan_unset": ("计划未定", "No due date"),
-    "tl.replan": ("改到 {due}", "Moved to {due}"),
+    "tl.orig": ("原计划 {due}", "Originally {due}"),
     "tl.start": ("开始 {day}", "Start {day}"),
     "tl.late": ("延期 {late}", "{late} late"),
     "tl.done_at": ("完成 {time}", "done {time}"),
@@ -286,12 +286,13 @@ M: dict[str, tuple[str, str]] = {
     "lg.pause": ("暂停（等依赖 / 等外部）", "Paused (waiting on a dependency / on someone outside)"),
     "lg.no_stages": ("灰条「没分环节」= 没有环节记录，只看起止：笼统的事项、按旧方式做的目标，或刚立项还没开始记环节",
                      "Grey bar “No stages” = no stage records, just start and end: a broad goal, or one that hasn't started tracking stages"),
-    "lg.marks": ("「开始 09-28」= 开始的日子；「计划 10-02」或「计划 10-02 08:00」= 计划完成（立项时定的，只写日期的算当天结束）；虚线「改到 …」= 改期后的",
-                 "“Start 09-28” = the day it began; “Due 10-02” or “Due 10-02 08:00” = the planned finish set at creation (a date alone means end of that day); dashed “Moved to …” = after replanning"),
+    "lg.marks": ("「开始 09-28」= 开始的日子；「计划 10-02」或「计划 10-02 08:00」= 计划完成（最后一次定的，只写日期的算当天结束）；改过期的，灰虚线「原计划 …」= 最早定的",
+                 "“Start 09-28” = the day it began; “Due 10-02” or “Due 10-02 08:00” = the planned finish, as last set (a date alone means end of that day); after a replan, grey dashed “Originally …” = the first plan"),
     "lg.life": ("底下的细线 = 目标从开始到现在（或结束）", "Thin line underneath = the goal from start to now (or to its end)"),
     "lg.future": ("虚线「还在做」= 没做完的事从现在往后：开着的环节同色，没分环节、眼下没环节开着的（等别人 / 暂停）灰色",
                   "Dashed “still going” line = unfinished work from now on: same color as the open stage; grey when there are no stages or none is open (waiting / paused)"),
-    "lg.late": ("红框「延期 N 小时 / N 天」= 超出计划多久（不满一天按小时）", "Red box “N hours / N days late” = how far past plan (hours when under a day)"),
+    "lg.late": ("红框「延期 N 小时 / N 天」= 超出计划多久（不满一天按小时）；改过期的从新的计划算，新日期没到就不红",
+                "Red box “N hours / N days late” = how far past plan (hours when under a day); after a replan it counts from the new date, so nothing is red until that passes"),
     "lg.done": ("✓ = 完成的那一刻，名称下面写「已完成 MM-DD」（灰 ✕ = 放弃）；已结束的事只在时间线拖到那段时才显示",
                 "✓ = the moment it was done, with “Done MM-DD” under the name (grey ✕ = abandoned); ended goals show only when the timeline is dragged to their period"),
     "lg.version": ("蓝边小牌 = 这件事挂在哪个版本下，点了看版本", "Blue-outlined chip = the version this goal is attached to; click to open it"),
@@ -655,7 +656,8 @@ M: dict[str, tuple[str, str]] = {
         "source 是来源号：从个人看板推上来的目标，填它在个人看板立项时发的出生号（本人字母＋序号，字母见取值表 source_letters），"
         "字母要和推的人对得上；全看板唯一，一辈子不变，按它能查到这个目标（GET /api/board/resolve?num=…）。团队看板上直接立的不填。"
         "note 是「做什么」（详情页标题下显示，500 字以内）：AI 自判写不写、不问人——没参与的人只看标题能知道要达成什么、"
-        "做到什么算完就空着；不能就写一到两句：要达成什么结果 + 怎么算达成（能验证的判据，不写实现）",
+        "做到什么算完就空着；不能就写一到两句：要达成什么结果 + 怎么算达成（能验证的判据，不写实现）。"
+        "version 是挂的版本：GitHub 里程碑写「仓库#编号」（有版本页、版本行），没建里程碑的直接写版本名（例「v1.2」，40 字以内，只显示成牌子）",
         "Create a goal (whether to do it is settled elsewhere; only decided goals go on the board). "
         "parent_id is the goal it is split from (without line it stays on the parent's line; a business goal may split onto another line, then pass line). "
         "due is the planned finish in the primary time zone: 2026-10-15, or to the hour 2026-10-15 08:00; it may be left open. "
@@ -667,7 +669,9 @@ M: dict[str, tuple[str, str]] = {
         "(GET /api/board/resolve?num=…). Leave it out for goals created here directly. "
         "note is the “What” (shown under the title, up to 500 characters): the AI decides whether to write it, without asking. Leave it empty when the title alone "
         "tells an outsider what is to be achieved and when it counts as done; otherwise one or two sentences: the outcome, and how to tell it's reached "
-        "(a checkable criterion, not the implementation)"),
+        "(a checkable criterion, not the implementation). "
+        "version is the attached version: a GitHub milestone as “repo#number” (it gets a version page and row), or just a version name "
+        "when there is no milestone (e.g. “v1.2”, up to 40 characters, shown only as a badge)"),
     "act.create.who": ("团队负责人（owner 角色）；负责人可以在自己负责的目标下面拆子目标给自己（拆给别人、另开一棵仍只有团队负责人能做）",
                        "Team owners (role owner); a goal's owner may split sub-goals under their own goal for themselves "
                        "(assigning to someone else, or starting a new tree, stays with team owners)"),
@@ -699,11 +703,11 @@ M: dict[str, tuple[str, str]] = {
     "act.unlink_issue.desc": ("取消关联 GitHub 单", "Unlink a GitHub issue"),
     "act.unlink_issue.who": ("负责人或团队负责人", "The owner or a team owner"),
     "act.edit_goal.desc": (
-        "改名称、说明、挂的版本、从哪个目标拆出来（parent_id；填 - 表示不属于任何上层；改上层和换线只有团队负责人能做），"
+        "改名称、说明、挂的版本（里程碑「仓库#编号」或版本名文字，同立项；填 - 表示不挂）、从哪个目标拆出来（parent_id；填 - 表示不属于任何上层；改上层和换线只有团队负责人能做），"
         "换线（原来同一条线的下层跟着走），或改「长期负责」标记（long_term=1/0）；"
         "source 给早先从个人看板推上来、当时没带来源号的目标补上出生号（只有团队负责人能补，已有来源号的不能改——补错了作废那条记录）；"
         "note / done_what 改「做什么 / 做了什么」（填空 = 清空；done_what 只能写在已完成的目标上）",
-        "Change the title, the note, the attached version, the parent (parent_id; - means no parent; only team owners may change the parent or the line), "
+        "Change the title, the note, the attached version (a milestone “repo#number” or a version name, as at creation; - detaches it), the parent (parent_id; - means no parent; only team owners may change the parent or the line), "
         "the line (sub-goals on the same line follow), or the ongoing flag (long_term=1/0). "
         "source adds a source number to a goal that was pushed up earlier without one (team owners only; an existing one can't be changed, void the record if it was wrong). "
         "note / done_what edit “What / What was done” (empty clears it; done_what only on a goal that is done)"),

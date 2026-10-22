@@ -136,3 +136,43 @@ def test_version_card_is_highest_number_not_latest_release(conn):
     assert [r["version"] for r in d["releases"]] == ["v1.3.2", "v1.3.1"]
     apply_action(conn, "release", {"goal": g, "version": "v1.3.10", "text": "按数字比"}, NOW + timedelta(minutes=7))
     assert goal_detail(conn, g)["goal"]["version_name"] == "v1.3.10"   # 1.3.10 > 1.3.2: compared as numbers, not text
+
+
+def test_due_change_on_team_goal_cannot_be_skipped(conn):
+    """A plan change on a team-line goal must be pushed (delay is measured from the current plan on both boards):
+    marking it skip refuses the whole batch; voiding it still works, and so does marking it pushed."""
+    r = apply_action(conn, "goal_create", {"title": "团队线上的事", "line": "增长", "due": "2026-10-05"}, NOW)
+    s = apply_action(conn, "stage_start", {"goal": r.gnum, "stage": "开发"}, NOW)
+    d = apply_action(conn, "goal_update", {"goal": r.gnum, "due": "2026-10-09", "reason": "往后放"}, NOW)
+    sync = lambda i: conn.execute("SELECT sync FROM entries WHERE id=?", (i,)).fetchone()[0]  # noqa: E731
+    with pytest.raises(ActionError) as e:
+        apply_action(conn, "sync_mark", {"entry_ids": [s.ids[0], d.ids[0]], "status": "skip"}, NOW)
+    assert "改期要推到团队看板" in str(e.value) and str(d.ids[0]) in str(e.value)
+    assert sync(s.ids[0]) == "pending" and sync(d.ids[0]) == "pending"     # nothing in the batch was marked
+    apply_action(conn, "sync_mark", {"entry_ids": [s.ids[0]], "status": "skip"}, NOW)   # other entries can still be skipped
+    assert sync(s.ids[0]) == "skip"
+    apply_action(conn, "void", {"entry_id": d.ids[0], "reason": "记错了"}, NOW)          # a mistaken plan change is voided
+    d2 = apply_action(conn, "goal_update", {"goal": r.gnum, "due": "2026-10-10", "reason": "再改"}, NOW)
+    apply_action(conn, "sync_mark", {"entry_ids": d2.ids, "status": "pushed", "team_ref": "41"}, NOW)
+    assert sync(d2.ids[0]) == "pushed"
+    p = apply_action(conn, "goal_create", {"title": "自己的事", "line": "个人事项", "due": "2026-10-05"}, NOW)
+    pd = apply_action(conn, "goal_update", {"goal": p.gnum, "due": "2026-10-08"}, NOW)
+    assert pd.ids == [] or all(sync(i) != "pending" for i in pd.ids)        # a personal goal's plan change is never pending
+
+
+def test_version_badge_change_on_pushed_goal_goes_to_pending(conn):
+    """A pushed goal's badge change joins the single "summary edited" entry and the pending list carries the current
+    badge; a long-running row's badge is this board's own version number and is not pushed."""
+    from app.view import pending_entries
+    g = apply_action(conn, "goal_create", {"title": "小迭代", "line": "增长"}, NOW)
+    ids = [r[0] for r in conn.execute("SELECT id FROM entries WHERE sync='pending'")]
+    apply_action(conn, "sync_mark", {"entry_ids": ids, "status": "pushed"}, NOW)
+    apply_action(conn, "goal_update", {"goal": g.gnum, "version_name": "v1.1"}, NOW)
+    apply_action(conn, "goal_update", {"goal": g.gnum, "what": "X", "version_name": "v1.2"}, NOW + timedelta(minutes=1))
+    rows = conn.execute("SELECT text FROM entries WHERE kind='summary' AND sync='pending'").fetchall()
+    assert [r[0] for r in rows] == ["改「做什么」：X；改「版本牌」：v1.2"]
+    assert [e["goal_version"] for e in pending_entries(conn) if e["kind"] == "summary"] == ["v1.2"]
+    lt = apply_action(conn, "goal_create", {"title": "持续维护", "line": "团队协作", "long_term": True}, NOW).gnum
+    apply_action(conn, "goal_update", {"goal": lt, "version_name": "v1.0"}, NOW)
+    assert conn.execute("SELECT COUNT(*) FROM entries e JOIN goals g ON g.id=e.goal_id WHERE g.gnum=? AND e.kind='summary'",
+                        (lt,)).fetchone()[0] == 0

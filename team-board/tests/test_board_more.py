@@ -28,6 +28,26 @@ def _band(page: str, line: str) -> str:
     return page[i:j if j > 0 else None]
 
 
+def test_version_accepts_plain_name_as_badge(tmp_path):
+    """不建里程碑的迭代，版本直接写「v1.2」这样的文字。文字版本只当牌子：两个目标挂同一个也不成行、没有版本页；
+    带 # 的仍按里程碑严格校验。"""
+    _app, c = _client(tmp_path)
+    a = _act(c, "create", title="数据看板", line="增长", owner="linxia", version="v1.2")["goal_id"]
+    b = _act(c, "create", title="反馈小迭代", line="增长", owner="linxia")["goal_id"]
+    _act(c, "edit_goal", goal_id=b, version="v1.2")
+    growth = _band(c.get("/board").text, "增长")
+    assert growth.count('<span class="bd-vn" title="版本 v1.2">v1.2</span>') == 2
+    assert "版本 v1.2</a>" not in growth and "装着" not in growth          # 不成版本行
+    page = c.get(f"/board/goal/{a}").text
+    assert '<span class="bd-tag bd-tag-ver">版本 v1.2</span>' in page and "/board/version?" not in page
+    g = next(x for x in c.get("/api/board/state").json()["goals"] if x["id"] == b)
+    assert g["version"]["name"] == "v1.2"                                  # 个人看板拉取靠这个名字对齐版本牌
+    r = c.post("/api/board/act", json={"action": "edit_goal", "params": {"goal_id": b, "version": "acme/nope#3"}})
+    assert r.status_code == 400 and "仓库#里程碑编号" in r.text             # 带 # 写错不悄悄当文字收
+    r = c.post("/api/board/act", json={"action": "edit_goal", "params": {"goal_id": b, "version": "v" * 41}})
+    assert r.status_code == 400
+
+
 def test_index_marks_done_and_abandoned_goals(tmp_path):
     _app, c = _client(tmp_path)
     a = _act(c, "create", title="做完的事", line="管理与协作", owner="linxia", due="2026-10-05",
@@ -164,12 +184,13 @@ def test_hourly_due_shows_on_pages_and_delay_counts_hours(tmp_path, monkeypatch)
     g = next(x for x in c.get("/api/board/state").json()["goals"] if x["id"] == gid)
     assert g["latest_due"] == "2026-10-02 08:00" and g["baseline_due"] == "2026-10-02"
     page = c.get("/board?zoom=day").text
-    assert "改到 10-02 08:00" in page and "计划 10-02 08:00（原定 10-02）" in page
+    assert "原计划 10-02" in page and "计划 10-02 08:00（原定 10-02）" in page
     assert "zoom-day" in page and ">02:00</span>" in page and "选一天" in page
-    # 延期按小时：现在是洛杉矶 10-02 11:30，超出基准（10-02 23:59）还没到 → 不延期；把基准当成 08:00，超出 3 小时半写 4 小时（四舍五入，同个人看板）
+    # 延期按小时、从现在的计划算：现在是洛杉矶 10-02 11:30，改到的 08:00 已过 3 小时半 → 写 4 小时（四舍五入，同个人看板）；
+    # 原定的 10-02 23:59 还没到也照算
     fixed = datetime(2026, 10, 2, 18, 30, tzinfo=timezone.utc)      # 洛杉矶 11:30
     monkeypatch.setattr(routes, "utc_now", lambda: fixed)
-    assert next(x for x in c.get("/api/board/state").json()["goals"] if x["id"] == gid)["delay_text"] == ""
+    assert next(x for x in c.get("/api/board/state").json()["goals"] if x["id"] == gid)["delay_text"] == "4 小时"
     g2 = _act(c, "create", title="八点前的事", line="管理与协作", owner="linxia", due="2026-10-02 08:00",
               occurred_at="2026-10-01T22:50:00-07:00")["goal_id"]
     d = c.get("/api/board/state").json()

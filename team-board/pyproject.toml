@@ -1,6 +1,6 @@
 [project]
 name = "team-board"
-version = "1.0.0"
+version = "1.1.0"
 description = "A goal timeline for a small team: who owns what, how long each stage took, where it is stuck. Dictate to your AI; it records via MCP."
 requires-python = ">=3.11"
 dependencies = [

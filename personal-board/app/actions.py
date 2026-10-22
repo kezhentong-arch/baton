@@ -172,6 +172,9 @@ def _no_push(conn: sqlite3.Connection, goal_id: int) -> bool:
 # Length limits of the goal summary. `what` becomes the team board's note (500) and `done_what` is 1000 on
 # both sides; checked here so a push at wrap-up is not the first place it fails.
 SUMMARY_MAX = {"what": 500, "done_what": 1000}
+# What a "summary edited" entry carries to the team board: the two summary fields and the version badge (the team
+# board takes a version as plain text too, so a badge changed here on a pushed goal has to go up with them).
+SUMMARY_KEYS = ("what", "done_what", "version_name")
 
 
 def _summary(params: dict, key: str) -> str:
@@ -332,10 +335,12 @@ def _goal_update(conn, params, now) -> Result:
     goal = _goal(conn, params["goal"])
     sets: dict[str, object] = {}
     ids: list[int] = []
+    changed = []   # summary fields / badge that changed: a goal already on the team board gets one "summary edited" entry to push
     for k in ("title", "next_step", "blocker", "version_name"):
         if k in params:
-            sets[k] = str(params[k])
-    changed = []   # summary fields that changed: a goal already on the team board gets one "summary edited" entry to push
+            sets[k] = str(params[k]).strip() if k == "version_name" else str(params[k])
+            if k == "version_name" and sets[k] != (goal[k] or "") and not goal["long_term"]:
+                changed.append(k)   # a long-running row's badge is this board's own version number (release), not pushed
     for k in ("what", "done_what"):
         if k not in params:
             continue
@@ -437,7 +442,7 @@ def _goal_update(conn, params, now) -> Result:
             # leaving it unpushed forever.
             prev = conn.execute("SELECT id, text FROM entries WHERE goal_id=? AND kind='summary' AND sync='pending' AND voided_at IS NULL"
                                 " ORDER BY id DESC LIMIT 1", (goal["id"],)).fetchone()
-            keys = [k for k in ("what", "done_what")
+            keys = [k for k in SUMMARY_KEYS
                     if k in pushed or (prev and any(_summary_mark(k, lang) in prev["text"] for lang in LANGS))]
             text = t("text.semi").join(_summary_mark(k) + ((sets[k] if k in sets else goal[k]) or t("text.cleared")) for k in keys)
             when = _when(params, now)
@@ -577,6 +582,17 @@ def _sync_mark(conn, params, now) -> Result:
                if str(x).strip()]
     except ValueError:
         raise ActionError(t("err.bad_entry_ids", value=repr(raw))) from None
+    if status == "skip":
+        # A plan change on a goal that is also on the team board must be pushed: delay is measured from the current plan,
+        # so two different plans would give two different delays. One logged by mistake is voided instead.
+        due = []
+        for eid in ids:
+            e = conn.execute("SELECT goal_id FROM entries WHERE id=? AND kind='due' AND sync='pending'", (eid,)).fetchone()
+            g = e and conn.execute("SELECT * FROM goals WHERE id=?", (e["goal_id"],)).fetchone()
+            if g and settings.is_team_line(g["line"]) and not points.is_point(g):
+                due.append(t("err.due_skip_item", id=eid, gnum=g["birth"] or g["gnum"], title=g["title"]))
+        if due:
+            raise ActionError(t("err.due_skip", which=_join(due)))
     for eid in ids:
         if conn.execute("UPDATE entries SET sync=?, synced_at=?, team_ref=? WHERE id=? AND sync='pending'",
                         (status, iso(now), str(params.get("team_ref") or ""), eid)).rowcount != 1:

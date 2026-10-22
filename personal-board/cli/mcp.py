@@ -33,7 +33,7 @@ from app.view import goal_detail, pending_entries, state, timeline  # noqa: E402
 
 SERVER_NAME = "personal-board"
 PREFIX = "personal_board_"
-SERVER_VERSION = "1.0.0"
+SERVER_VERSION = "1.1.0"
 PROTOCOL_VERSION = "2025-06-18"
 GUIDE_DIR = Path(__file__).resolve().parents[1] / "app"
 ENV_PRACTICE = "PERSONAL_BOARD_PRACTICE"

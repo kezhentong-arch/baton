@@ -198,6 +198,13 @@ def duration_text(td: timedelta) -> str:
     return unit(f"{round(sec / 86400, 1):g}", "day")
 
 
+def is_milestone(ref: str) -> bool:
+    """目标挂的版本有两种：GitHub 里程碑「仓库#编号」，或直接一段版本名文字（例「v1.2」）。不建单、不建里程碑的迭代
+    不必为了看板显示去 GitHub 建空里程碑；没接 GitHub 的团队也能挂版本牌。文字版本只当牌子显示：不单独成行、没有版本页。
+    立项 / 改目标时带 # 的必须是合法里程碑（见 actions）。"""
+    return "#" in ref
+
+
 def gh_due_day(dt: datetime) -> date:
     """GitHub 里程碑的截止日存成「那天 00:00 UTC」。按 UTC 取日期才是 GitHub 上看到的那天；
     换成别的时区可能变成前一天（例：2026-07-22T00:00Z 在 UTC-7 是 07-21 17:00）。"""

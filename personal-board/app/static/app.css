@@ -111,8 +111,8 @@ nav.modes a{padding:4px 12px;border-radius:7px;font-size:13px;color:var(--dim);t
 .due-line.late{border-left-color:#ff3b30}
 .due-line span{position:absolute;top:2px;left:4px;font-size:10.5px;font-weight:600;color:var(--warn);white-space:nowrap}
 .due-line.late span{color:#ff3b30}
-.due-line.re{border-left:1.5px dotted color-mix(in srgb,var(--dim) 80%,transparent)}  /* A revised plan: faint dotted line, label one row lower so it does not overlap the original plan label. */
-.due-line.re span{top:15px;color:var(--dim);font-weight:500}
+.due-line.orig{border-left:1.5px dotted color-mix(in srgb,var(--dim) 80%,transparent)}  /* The first plan of a replanned goal: faint grey dotted line and grey label at the same height as "plan" (no label when the two are close; see timeline.js). */
+.due-line.orig span{color:var(--dim);font-weight:500}
 .life{position:absolute;bottom:3px;height:3px;border-radius:2px;background:color-mix(in srgb,var(--dim) 55%,transparent)}
 /* Still going: a faint dashed line from "now" to the visible right edge; its width follows the drag (--vis is the visible left edge). */
 .seg-future{position:absolute;left:var(--l);width:max(0px,calc(var(--vis) - var(--l) + 100vw));height:0;border-top:2px dashed var(--none-a);opacity:.55;pointer-events:none}

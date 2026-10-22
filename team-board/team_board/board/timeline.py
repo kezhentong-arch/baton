@@ -11,7 +11,7 @@ from datetime import date, datetime, time, timedelta
 
 from team_board import config
 from team_board.board.issues import GhData
-from team_board.board.model import (HOUR_TICK_STEP, Due, late_text, pause_kinds, people, person_name, stages,
+from team_board.board.model import (HOUR_TICK_STEP, Due, is_milestone, late_text, pause_kinds, people, person_name, stages,
                                     status_label, tz, tz_day, tz_note, tz_text)
 from team_board.board.state import Board, Goal, VersionTrack, delay_text
 from team_board.i18n import t
@@ -40,10 +40,11 @@ class Piece:
 
 @dataclass
 class Mark:
-    """计划完成日竖线：基准日实线，改期后的日期虚线，旁边写上日期（光一条白线看不懂）。"""
+    """计划完成日竖线，旁边写上日期（光一条白线看不懂）。现在的计划实线「计划 …」；改过期的，
+    最早定的那条灰虚线「原计划 …」，只留个淡印子、不算延期。"""
     x: float
     label: str
-    replan: bool = False
+    orig: bool = False
 
     @property
     def flip(self) -> bool:
@@ -237,21 +238,23 @@ def goal_pieces(g: Goal, now: datetime, sc: Scale) -> tuple[list[Piece], int]:
     return out, max(1, len(used))
 
 
-def _marks(baseline: Due | None, replans: list[Due], end: datetime | None,
+def _marks(baseline: Due | None, latest: Due | None, end: datetime | None,
            sc: Scale) -> tuple[list[Mark], tuple[float, float] | None]:
-    """计划竖线画在截止时刻：只写日期的在当天 23:59，写了时刻的在那个小时。"""
+    """计划竖线画在截止时刻：只写日期的在当天 23:59，写了时刻的在那个小时。
+    红框从现在的计划（最后一次定的）画到结束 / 现在；改过期的，最早定的那条画灰虚线「原计划」，中间改过的几次不画。
+    现在的计划排在最前：挤在一起时页面留第一个计划字。"""
     marks: list[Mark] = []
     over = None
-    if baseline:
-        dl = baseline.at
+    cur = latest or baseline
+    if cur:
+        dl = cur.at
         if sc.inside(dl):
-            marks.append(Mark(sc.x(dl), t("tl.plan", due=baseline.short)))
+            marks.append(Mark(sc.x(dl), t("tl.plan", due=cur.short)))
         if end and end > dl and sc.visible(dl, end):
             x1 = sc.x(dl)
             over = (x1, round(sc.x(end) - x1, 3))
-    for d in replans:
-        if sc.inside(d.at):
-            marks.append(Mark(sc.x(d.at), t("tl.replan", due=d.short), True))
+    if baseline and baseline != cur and sc.inside(baseline.at):
+        marks.append(Mark(sc.x(baseline.at), t("tl.orig", due=baseline.short), True))
     return marks, over
 
 
@@ -274,7 +277,8 @@ def _goal_row(g: Goal, now: datetime, sc: Scale, depth: int, root: str = "/board
     who = person_name(g.owner)
     title = g.title            # 不截断：名称列允许换两行，鼠标悬停有全名
     end = None if g.status == "abandoned" else (g.closed_at or now)
-    marks, over = _marks(g.baseline_due, [d for _, d, _ in g.due_changes], end, sc)
+    # 长期行不画计划线和红框（同个人看板）：写入口不让长期行定日期，作废记录才可能造出带计划的长期行
+    marks, over = ([], None) if g.long_term else _marks(g.baseline_due, g.latest_due, end, sc)
     pieces, lanes = goal_pieces(g, now, sc)
     bar_h = 22 if lanes == 1 else 16
     life = None
@@ -324,8 +328,8 @@ def _version_row(ref: str, vt: VersionTrack | None, gh: GhData, now: datetime, s
         if fut:
             pieces.append(fut)
     plans = [d for _, d in vt.plans] if vt else []
-    marks, over = _marks(plans[0] if plans else None, plans[1:], end, sc)
-    late = late_text(plans[0].at, end) if plans else ""
+    marks, over = _marks(plans[0] if plans else None, plans[-1] if plans else None, end, sc)
+    late = late_text(plans[-1].at, end) if plans else ""   # 版本同目标：从现在的计划算
     ended, ended_text, ended_x = _ended("done" if done_at else "", done_at, sc)
     return Row("version", _short(title, 22), version_href(ref, root),
                ended=ended, ended_text=ended_text, ended_x=ended_x, span=(sc.x(start), sc.x(end)),
@@ -373,7 +377,10 @@ def version_done_at(vt: VersionTrack | None, m) -> datetime | None:
 
 
 def version_name(ref: str, gh: GhData) -> str:
-    """版本的人话名字 = GitHub 里程碑标题；还没同步到时退回原始写法并注明（留痕里只有仓库#编号看不懂）。"""
+    """版本的人话名字 = GitHub 里程碑标题；还没同步到时退回原始写法并注明（留痕里只有仓库#编号看不懂）。
+    文字版本就是它自己。"""
+    if not is_milestone(ref):
+        return ref
     repo, num = ref.split("#")
     m = gh.milestones.get((repo, int(num)))
     return m.title if m else t("ver.unsynced", ref=ref)
@@ -381,15 +388,19 @@ def version_name(ref: str, gh: GhData) -> str:
 
 def version_carriers(b: Board, sample: bool) -> dict[str, list[Goal]]:
     """每个版本装着哪些目标：只数版本挂上来的那一层（上层没挂或挂的是别的版本、自己挂了），下层继承的不重复数——
-    一个目标和它拆出的块都挂同一个版本算一个目标。示例目标只在示例看板上算。首页据此决定版本要不要单独成行。"""
+    一个目标和它拆出的块都挂同一个版本算一个目标。示例目标只在示例看板上算。首页据此决定版本要不要单独成行。
+    只数里程碑：文字版本不成行。"""
     out: dict[str, list[Goal]] = {}
     for g in sorted(b.goals.values(), key=lambda g: g.id):
-        if g.version and (sample or not g.sample) and (g.parent_id is None or b.goals[g.parent_id].version != g.version):
+        if g.version and is_milestone(g.version) and (sample or not g.sample) and (g.parent_id is None or b.goals[g.parent_id].version != g.version):
             out.setdefault(g.version, []).append(g)
     return out
 
 
 def version_href(ref: str, root: str = "/board") -> str:
+    """版本页地址；文字版本没有版本页，给空串（牌子不做成链接）。"""
+    if not is_milestone(ref):
+        return ""
     repo, num = ref.split("#")
     return f"{root}/version?repo={repo}&number={num}"
 

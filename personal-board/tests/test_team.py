@@ -122,26 +122,77 @@ def test_pull_flags_goal_no_longer_mine(tmp_path):
     assert notes == 1
 
 
-def test_pull_keeps_local_hour_when_team_day_matches(tmp_path):
-    """The team board's plan may be a bare date while the local one carries an hour ("Friday before 8"). Same day: the
-    local hour is kept. A different day on the team board: the team board wins (and the hour goes)."""
+def test_pull_takes_team_due_with_hour_but_keeps_unpushed(tmp_path):
+    """The plan always follows the team board, hour included: keeping a local hour on the same day would have the two
+    boards measure delay from different moments. A local plan change not pushed yet is not overwritten: it aligns once pushed."""
     from app.actions import apply_action
     from datetime import timedelta
     conn = open_db(tmp_path / "t.sqlite")
     conn.execute("INSERT INTO meta(key, value) VALUES('person','linxia')")
     with mock.patch.object(team, "fetch_state", return_value=PAYLOAD):
         team.pull(conn, NOW)
+    due = lambda: conn.execute("SELECT due FROM goals WHERE gnum='G2.2'").fetchone()[0]  # noqa: E731
     r = apply_action(conn, "goal_update", {"goal": "G2.2", "due": "2026-10-02 08:00"}, NOW + timedelta(minutes=1))
-    apply_action(conn, "sync_mark", {"entry_ids": r.ids, "status": "skip"}, NOW + timedelta(minutes=2))  # the team board already says 10-02: nothing to push
+    with mock.patch.object(team, "fetch_state", return_value=PAYLOAD):     # not pushed yet: the team board's 10-02 leaves 08:00 alone
+        team.pull(conn, NOW + timedelta(minutes=2))
+    assert due() == "2026-10-02 08:00"
+    apply_action(conn, "sync_mark", {"entry_ids": r.ids, "status": "pushed"}, NOW + timedelta(minutes=3))  # pushed, then set back to 10-02 there
+    with mock.patch.object(team, "fetch_state", return_value=PAYLOAD):     # same day: the team board still wins
+        team.pull(conn, NOW + timedelta(minutes=4))
+    assert due() == "2026-10-02"
+    assert conn.execute("SELECT COUNT(*) FROM entries WHERE kind='due'").fetchone()[0] == 2   # the change there is noted
+    timed = {"goals": [dict(x, latest_due="2026-10-03 09:00") if x["gnum"] == "G2.2" else x for x in PAYLOAD["goals"]]}
+    with mock.patch.object(team, "fetch_state", return_value=timed):
+        team.pull(conn, NOW + timedelta(minutes=5))
+    assert due() == "2026-10-03 09:00"
+
+
+def test_pull_only_unpushed_due_change_protects_due(tmp_path):
+    """Only an unpushed plan change holds the plan back. Someone changes the plan on the team board while this goal has an
+    unpushed stage entry: the plan follows at once, while the summary and status still wait for the push. An unpushed
+    local plan change is not overwritten."""
+    from app.actions import apply_action
+    from datetime import timedelta
+    conn = open_db(tmp_path / "t.sqlite")
+    conn.execute("INSERT INTO meta(key, value) VALUES('person','linxia')")
     with mock.patch.object(team, "fetch_state", return_value=PAYLOAD):
-        team.pull(conn, NOW + timedelta(minutes=3))
-    assert conn.execute("SELECT due FROM goals WHERE gnum='G2.2'").fetchone()[0] == "2026-10-02 08:00"
-    assert conn.execute("SELECT COUNT(*) FROM entries WHERE kind='due'").fetchone()[0] == 1  # no extra "changed on the team board" entry
-    moved = {"goals": [dict(x, latest_due="2026-10-03") if x["gnum"] == "G2.2" else x for x in PAYLOAD["goals"]]}
+        team.pull(conn, NOW)
+    goal = lambda: conn.execute("SELECT due, what, status FROM goals WHERE gnum='G2.2'").fetchone()  # noqa: E731
+    apply_action(conn, "stage_start", {"goal": "G2.2", "stage": "开发"}, NOW + timedelta(minutes=1))   # one unpushed stage entry
+    moved = {"goals": [dict(x, latest_due="2026-10-06 12:00", note="那边改的做什么", status="已完成",
+                            done_at="2026-10-02T17:00:00+00:00") if x["gnum"] == "G2.2" else x for x in PAYLOAD["goals"]]}
+    with mock.patch.object(team, "fetch_state", return_value=moved):
+        team.pull(conn, NOW + timedelta(minutes=2))
+    assert tuple(goal()) == ("2026-10-06 12:00", None, "active")   # the plan follows; summary and status are held
+    r = apply_action(conn, "goal_update", {"goal": "G2.2", "due": "2026-10-09", "reason": "本地改期"}, NOW + timedelta(minutes=3))
     with mock.patch.object(team, "fetch_state", return_value=moved):
         team.pull(conn, NOW + timedelta(minutes=4))
-    assert conn.execute("SELECT due FROM goals WHERE gnum='G2.2'").fetchone()[0] == "2026-10-03"
-    assert conn.execute("SELECT COUNT(*) FROM entries WHERE kind='due'").fetchone()[0] == 2
+    assert goal()["due"] == "2026-10-09"                             # an unpushed plan change: not overwritten by 10-06
+    apply_action(conn, "sync_mark", {"entry_ids": r.ids, "status": "pushed"}, NOW + timedelta(minutes=5))
+    with mock.patch.object(team, "fetch_state", return_value=moved):
+        team.pull(conn, NOW + timedelta(minutes=6))
+    assert goal()["due"] == "2026-10-06 12:00"                       # pushed: the team board wins again
+
+
+def test_pull_keeps_local_version_badge_until_pushed(tmp_path):
+    """A badge just changed here and not pushed yet must not be put back by the team board's old one; once pushed, the team board wins."""
+    from app.actions import apply_action
+    conn = open_db(tmp_path / "t.sqlite")
+    conn.execute("INSERT INTO meta(key, value) VALUES('person','linxia')")
+    old = {"goals": [dict(x, version={"ref": "v1.1", "name": "v1.1"}) if x["gnum"] == "G2.2" else x for x in PAYLOAD["goals"]]}
+    with mock.patch.object(team, "fetch_state", return_value=old):
+        team.pull(conn, NOW)
+    badge = lambda: conn.execute("SELECT version_name FROM goals WHERE gnum='G2.2'").fetchone()[0]  # noqa: E731
+    assert badge() == "v1.1"
+    apply_action(conn, "goal_update", {"goal": "G2.2", "version_name": "v1.2"}, NOW)
+    with mock.patch.object(team, "fetch_state", return_value=old):
+        team.pull(conn, NOW)
+    assert badge() == "v1.2"
+    ids = [r[0] for r in conn.execute("SELECT id FROM entries WHERE sync='pending'")]
+    apply_action(conn, "sync_mark", {"entry_ids": ids, "status": "pushed"}, NOW)
+    with mock.patch.object(team, "fetch_state", return_value=old):     # nothing unpushed: follow the team board
+        team.pull(conn, NOW)
+    assert badge() == "v1.1"
 
 
 def test_pull_uses_team_moments_and_fixes_earlier_guesses(tmp_path):

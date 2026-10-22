@@ -1,6 +1,6 @@
 ---
 name: personal-board
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Personal Board guide — file every AI conversation under the work it belongs to
@@ -70,17 +70,18 @@ no process, reviews, test counts or commit ids. You decide whether to write it; 
 
    | Personal-board entry | Team-board action | Carries |
    |---|---|---|
-   | `goal_create` (team line) | `create` | title, owner, line, parent (its id on the team board), `due` (with the time, as is), `occurred_at`, `source` (the birth number: `birth` in the pending list), `note` (the "What": `goal_what`; omit when empty) |
+   | `goal_create` (team line) | `create` | title, owner, line, parent (its id on the team board), `due` (with the time, as is), `occurred_at`, `source` (the birth number: `birth` in the pending list), `note` (the "What": `goal_what`; omit when empty), `version` (the badge: `goal_version`; omit when empty) |
    | `stage_start` / `stage_end` | `start_stage` / `end_stage` | the goal's team-board id, `stage`, `occurred_at` |
    | `due` | `change_due` | goal id, `due` (with the time, as is), `reason` (put the reason into `reason` when logging the change) |
    | `abandon` | `abandon` | goal id, `reason` |
    | `complete` | `complete` | goal id, `occurred_at`, `done_what` (`goal_done_what`; omit when empty) |
-   | `summary` (a pushed goal's "What" / "Done" changed; one entry per goal) | `edit_goal` | goal id; `note` for "What", `done_what` for "Done" (send an explicit empty string to clear) |
+   | `summary` (a pushed goal's "What" / "Done" / badge changed; one entry per goal) | `edit_goal` | goal id; `note` for "What", `done_what` for "Done" (send an explicit empty string to clear), `version` for the badge (`goal_version`; `-` to clear) |
 
    Find the goal's team-board id in the team board's own state by its G number and verify it. **Never use this board's internal goal_id** — the two numbering schemes differ.
 5. After a successful push, `sync_mark` (`entry_ids`, `status=pushed`, `team_ref` = the event id returned). A newly created goal gets its G number: `goal_update gnum=G…`.
    If the team board refuses, relay its message as is and leave that entry unpushed; do not force it.
 6. The human says an entry should not be pushed → `sync_mark status=skip`, or `void` it and log again (voiding a "complete" does not reopen the goal; use `goal_update status=active`).
+   **A plan change (`due`) cannot be skipped**: delay is measured from the current plan, so the two boards must hold the same one; void a plan change logged by mistake. Better still, push a team-line goal's plan change right away instead of waiting for wrap-up.
 7. When a stage really changes hands mid-day, ask on the spot whether to push those entries now.
 
 One conversation owns a wrap-up; the others keep logging and do not push the same list at the same time. The personal board never writes to the team board itself — the team board's MCP is the only way in.

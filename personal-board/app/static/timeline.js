@@ -19,12 +19,17 @@
     return { y: +p.year, m: +p.month, d: +p.day, h: (+p.hour) % 24, mi: +p.minute, wd: p.weekday };
   }
   function dayIso(ms) { return fmtIso.format(new Date(ms)); }
-  function dayStartOf(iso) { // midnight of a date in the main time zone: step back from that day's UTC noon by the local clock, then correct once more for DST days
-    const noon = Date.parse(iso + 'T12:00:00Z');
-    let t = noon - wall(noon).h * H - wall(noon).mi * 60e3;
-    const w = wall(t); if (w.h !== 0 || w.mi !== 0) t -= w.h * H + w.mi * 60e3;
-    return t;
+  function offsetAt(ms) { const w = wall(ms); return Date.UTC(w.y, w.m - 1, w.d, w.h, w.mi) - Math.floor(ms / 60e3) * 60e3; }
+  // The moment a clock time on a date in the main time zone stands for, the same as the team board's Python (fold=0): try the
+  // zone's offsets a day either side, and keep the one whose clock reads back the same. An hour that repeats when clocks go back
+  // takes its first occurrence; an hour skipped when they go forward counts in the offset from before the change.
+  function zoneMs(iso, h = 0, mi = 0) {
+    const [y, m, d] = iso.split('-').map(Number), want = Date.UTC(y, m - 1, d, h, mi), before = offsetAt(want - D);
+    const ok = [before, offsetAt(want + D)].map(o => want - o)
+      .filter(t => { const w = wall(t); return Date.UTC(w.y, w.m - 1, w.d, w.h, w.mi) === want; });
+    return ok.length ? Math.min(...ok) : want - before;
   }
+  function dayStartOf(iso) { return zoneMs(iso); } // midnight of a date in the main time zone
   function dayStart(ms) { return dayStartOf(dayIso(ms)); }
   function addDays(iso, n) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
   function nextDay(ms) { return dayStartOf(addDays(dayIso(ms), 1)); }
@@ -88,17 +93,31 @@
   function descendants(gnum, vis) { return vis.filter(g => { let p = g.parent_gnum, n = 0; while (p && n < 8) { if (p === gnum) return true; p = S.byG[p] ? S.byG[p].parent_gnum : null; n++; } return false; }); }
   const STAGE_ORDER = CFG.stages;
   function dueMs(due) { // planned finish: a bare date means the last second of that day (23:59:59, the team board's rule too); with a time it is that moment
-    const [dd, tt] = due.split(/[ T]/);
-    return tt ? dayStartOf(dd) + (+tt.slice(0, 2)) * H + (+tt.slice(3, 5)) * 60e3 : nextDay(dayStartOf(dd)) - 1e3;
+    const [dd, tt] = due.split(/[ T]/);   // read on the clock (zoneMs), so a day when daylight saving starts or ends comes out right too
+    return tt ? zoneMs(dd, +tt.slice(0, 2), +tt.slice(3, 5)) : zoneMs(dd, 23, 59) + 59e3;
   }
   function lateText(ms) { // how late: hours under a day, otherwise days (one decimal under ten); points.late_text matches this character for character — change both together
     if (ms < 3600e3) return '';
     return ms < D ? T('late_hours', { n: Math.round(ms / H) }) : T('late_days', { n: (ms / D).toFixed(ms / D >= 10 ? 0 : 1) });
   }
-  function lateOf(g) { // delay: up to now for a goal in progress, up to completion for a finished one; measured from the first plan ever set, even after the plan was changed
-    if (!g.baseline_due || g.long_term || g.status === 'abandoned') return 0;   // an abandoned goal is not late
-    const end = g.done_at ? Date.parse(g.done_at) : S.now;
-    return Math.max(0, end - dueMs(g.baseline_due));
+  function lateOf(g, now) { // delay: up to now for a goal in progress, up to completion for a finished one; measured from the current plan
+    // (`due`, the last one set): after a replan nothing is late until the new date passes; with the plan cleared there is no delay
+    if (!g.due || g.long_term || g.status === 'abandoned') return 0;   // ongoing rows and abandoned goals are never late (team board: state._counts_late)
+    const end = g.done_at ? Date.parse(g.done_at) : now;
+    return Math.max(0, end - dueMs(g.due));
+  }
+  // How the plan lines of one goal row are drawn (a pure function, tests call it): plan = the main line at the current plan,
+  // orig = the grey "originally" line (only after a replan, or with the plan cleared); the red run starts at lateFrom (= the
+  // main line) and runs `late` ms; an empty lateLabel = under an hour, so no label and no red run
+  function dueMarks(g, now) {
+    if (g.long_term) return { plan: null, orig: null, late: 0, lateLabel: '', lateFrom: null };
+    const plan = g.due ? { at: dueMs(g.due), label: T('plan_at', { at: g.due.slice(5) }) } : null;
+    const late = lateOf(g, now), lt = late ? lateText(late) : '';
+    return {
+      plan,
+      orig: g.baseline_due && g.baseline_due !== g.due ? { at: dueMs(g.baseline_due), label: T('orig_at', { at: g.baseline_due.slice(5) }) } : null,
+      late, lateLabel: lt ? T(g.done_at ? 'late_done' : 'late', { late: lt }) : '', lateFrom: lt ? plan.at : null,
+    };
   }
   // one occurrence of a point task: the server's state is as of the fetch; between 30-second refreshes an "upcoming" one may have passed, so judge again against S.now
   function occState(o) { return o.state === 'upcoming' && Date.parse(o.at) <= S.now ? 'overdue' : o.state; }
@@ -223,20 +242,23 @@
       const f = document.createElement('div'); f.className = 'seg-future life-f'; f.style.setProperty('--l', x(S.now) + 'px'); row.appendChild(f);
     }
     const sl = document.createElement('div'); sl.className = 'start-label'; sl.style.left = x(st0) + 'px'; sl.textContent = T('started', { at: fmtTime(st0).slice(0, 5) }); row.appendChild(sl);
-    if (g.baseline_due && !g.long_term) { // the plan line stands at the first plan ever set, labelled "plan MM-DD"; past it a red run to now says how late
-      const t = dueMs(g.baseline_due), late = lateOf(g);
-      const dl = document.createElement('div'); dl.className = 'due-line' + (late ? ' late' : ''); dl.style.left = x(t) + 'px';
-      dl.innerHTML = `<span>${T('plan_at', { at: g.baseline_due.slice(5) })}</span>`; row.appendChild(dl);
-      if (g.due && g.due !== g.baseline_due) { // a changed plan: the new one gets its own faint line "moved to MM-DD"; delay is still measured from the line above
-        const rl = document.createElement('div'); rl.className = 'due-line re'; rl.style.left = x(dueMs(g.due)) + 'px';
-        rl.innerHTML = `<span>${T('moved_to', { at: g.due.slice(5) })}</span>`; row.appendChild(rl);
-      }
-      if (late && lateText(late)) {
-        const seg = document.createElement('div'); seg.className = 'late-seg'; seg.style.left = x(t) + 'px'; seg.style.width = Math.max(2, x(t + late) - x(t)) + 'px';
-        row.appendChild(seg);
-        const ll = document.createElement('div'); ll.className = 'late-label'; ll.style.left = x(t + late) + 'px';
-        ll.textContent = T(g.done_at ? 'late_done' : 'late', { late: lateText(late) }); row.appendChild(ll);
-      }
+    // The plan line stands at the current plan, labelled "plan MM-DD"; past it a red run to now says how late. After a replan
+    // the first plan gets a faint grey line "originally MM-DD": just a trace, not counted for delay (the team board draws it the same way)
+    const dm = dueMarks(g, S.now);
+    if (dm.plan) {
+      const dl = document.createElement('div'); dl.className = 'due-line' + (dm.late ? ' late' : ''); dl.style.left = x(dm.plan.at) + 'px';
+      dl.innerHTML = `<span>${dm.plan.label}</span>`; row.appendChild(dl);
+    }
+    if (dm.orig) { // its label sits at the same height as "plan"; when the two lines are within 120px only the grey line is drawn, so the labels never overlap
+      const ol = document.createElement('div'); ol.className = 'due-line orig'; ol.style.left = x(dm.orig.at) + 'px';
+      if (!dm.plan || Math.abs(x(dm.plan.at) - x(dm.orig.at)) >= 120) ol.innerHTML = `<span>${dm.orig.label}</span>`;
+      row.appendChild(ol);
+    }
+    if (dm.lateLabel) {
+      const t = dm.lateFrom, seg = document.createElement('div'); seg.className = 'late-seg'; seg.style.left = x(t) + 'px';
+      seg.style.width = Math.max(2, x(t + dm.late) - x(t)) + 'px'; row.appendChild(seg);
+      const ll = document.createElement('div'); ll.className = 'late-label'; ll.style.left = x(t + dm.late) + 'px';
+      ll.textContent = dm.lateLabel; row.appendChild(ll);
     }
     return line;
   }
@@ -516,10 +538,26 @@
     const t = dayStartOf(iso); glideTo(S.zoom === 'day' ? t : t - span() / 2 + D / 2); selectDay(iso); } }));
   window.addEventListener('resize', () => { S.pxh = fitPxh(); renderHead(); renderRows(true, { noFade: true }); place(); });
 
+  // Coming back from a detail page lands where you left: the home page is not cached, so going back reloads it, and the
+  // timeline is drawn only after its data arrives — the browser's own scroll restore runs while the page is still short and
+  // lands in the entries below, with the timeline back on today. So the scroll position and the timeline window are saved on
+  // leaving and restored once drawn.
+  const backKey = () => 'mb.back:' + location.pathname + location.search;
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  window.addEventListener('pagehide', () => { try { sessionStorage.setItem(backKey(), JSON.stringify({ y: window.scrollY, t0: S.t0, zoom: S.zoom })); } catch (e) {} });
+  function savedBack() {
+    const nav = performance.getEntriesByType ? performance.getEntriesByType('navigation')[0] : null;
+    if (!nav || nav.type !== 'back_forward') return null;
+    try { return JSON.parse(sessionStorage.getItem(backKey()) || 'null'); } catch (e) { return null; }
+  }
+
   (async function init() {
     for (const b of el.zoom.querySelectorAll('button')) b.classList.toggle('on', b.dataset.zoom === S.zoom);
     S.now = Date.now(); S.origin = dayStart(S.now); S.pxh = fitPxh(); S.t0 = homeT0(); S.selDay = (window.__STATE__ && window.__STATE__.day.iso) || dayIso(S.now);
+    const back = savedBack();
+    if (back && back.zoom === S.zoom && Number.isFinite(back.t0)) S.t0 = back.t0;
     await ensureData(true); renderHead(); renderRows(true); place();
     el.date.textContent = '📅 ' + dayIso(S.t0 + span() / 2);
+    if (back && Number.isFinite(back.y)) window.scrollTo(0, back.y);
   })();
 })();

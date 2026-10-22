@@ -47,6 +47,7 @@ ZH: dict[str, str] = {
     "abandon.default": "放弃",
     "label.what": "做什么",
     "label.done_what": "做了什么",
+    "label.version_name": "版本牌",
     "stage.open": "进行中",
     "stage.ended": "已结束 {at}",
     "stage.none": "未分环节",
@@ -98,6 +99,8 @@ ZH: dict[str, str] = {
                        "（repeat 填 none 改成只做一次），会记一条备注；取消：status=abandoned，之后不再出点，取消了不再恢复（要再做就新建）。"
                        "what / done_what 改「做什么 / 做了什么」（人说要改才改；填空字符串 = 清空）：done_what 只能写在已完成的目标上，"
                        "长期行的按版本写（release）；目标已经在团队看板上的，会记一条「改概要」（未推），收尾时推团队看板的 edit_goal。"
+                       "version_name 是版本牌（例「v1.2」，团队看板上 40 字以内）：已在团队看板上的目标改了牌子同样记进「改概要」一并推；"
+                       "长期行的牌子用 release 换、不推。"
                        "放弃时 reason 写一句为什么放弃，详情页显示在「做了什么」那一栏。",
     "act.log": "记一条：kind=start（开工）/ result（看得见的结果）/ wrap（收尾）/ note（备注）/ digest（沉淀：经验或规则写进了手册、知识库，文字写「手册 x.y.z：沉淀了什么」）；"
                "stage 填配置里的环节之一或不填（未分环节）。"
@@ -119,7 +122,8 @@ ZH: dict[str, str] = {
     "act.todo_done": "待办完成。",
     "act.note_add": "口述框保存一段原话（页面用）。",
     "act.note_resolve": "AI 处理完一条口述后标记，写一句录了什么。",
-    "act.sync_mark": "把记录标成已推到团队看板（status=pushed）或不推（skip）。entry_ids 是记录编号列表；team_ref 写团队看板返回的事件号。",
+    "act.sync_mark": "把记录标成已推到团队看板（status=pushed）或不推（skip）。entry_ids 是记录编号列表；team_ref 写团队看板返回的事件号。"
+                     "团队线上目标的「改计划日」不能标不推（整批拒绝）：改期要推到团队看板，两边计划日才一致；记错了用 void 作废。",
     "act.void": "作废一条记错的记录（留痕，不删）。",
 
     # ---------- 写操作的报错 ----------
@@ -178,6 +182,8 @@ ZH: dict[str, str] = {
     "err.bad_sync_status": "status 只能是 pushed / skip",
     "err.bad_entry_ids": "entry_ids 要是记录编号列表，收到 {value}",
     "err.not_pending": "记录 {id} 不是待推状态",
+    "err.due_skip": "改期要推到团队看板，两边计划日才一致，不能标不推：{which}是改计划日。这一批都没标；记错了的改期用 void 作废",
+    "err.due_skip_item": "记录 {id}（{gnum} {title}）",
     "err.void": "记录 {id} 不存在或已作废",
     "err.not_point_done": "{gnum} 不是点状任务（普通目标做完用 complete）",
     "err.point_cancelled": "{gnum} 已经取消了",
@@ -425,7 +431,7 @@ ZH: dict[str, str] = {
     "js.stage_of": "{stage} 环节",
     "js.started": "开始 {at}",
     "js.plan_at": "计划 {at}",
-    "js.moved_to": "改到 {at}",
+    "js.orig_at": "原计划 {at}",
     "js.items_folded": "收起 {n} 项",
     "js.items_n": "{n} 项",
     "js.none_here": "这段时间没有",

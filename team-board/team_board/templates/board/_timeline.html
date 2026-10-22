@@ -23,7 +23,7 @@
       {%- for r in band.rows %}
       <div class="bd-row bd-item{{ ' bd-verrow' if r.kind == 'version' }}{{ ' bd-top' if r.anc|length == 1 else ' bd-child' }}{{ ' bd-fam bd-fam' ~ r.fam_tint if r.fam }}{% if v.person %}{{ ' bd-match' if r.match else ' bd-path' }}{% endif %}{{ ' bd-ended' if r.ended }}" data-anc="{{ r.anc|join(' ') }}" data-span="{{ r.span[0] }} {{ r.span[1] }}"{% if r.ended %} data-ended="{{ r.ended }}"{% endif %}{% if r.fam %} data-fam="{{ r.fam }}"{% endif %} data-owner="{{ r.owner_key }}" data-people="{% for k, n in r.people %}{{ k }}:{{ n }}{{ ' ' if not loop.last }}{% endfor %}" style="min-height:{{ r.h }}px">
         <div class="bd-lbl" style="padding-left:{{ 6 + r.depth * 18 }}px">{% if r.fold_key %}<button type="button" class="bd-fold" data-key="{{ r.fold_key }}">▾</button>{% else %}<span class="bd-fold-sp"></span>{% endif %}
-          <div class="bd-lbl-text"><div class="bd-lbl-title">{% if r.gid %}<span class="bd-gid">{{ r.gid }}{% if r.source %}<span class="bd-src" title="{{ t('tl.source_tip') }}"> · {{ r.source }}</span>{% endif %}</span>{% endif %}<a href="{{ r.href }}" title="{{ r.full_title }}">{{ r.title }}</a>{% if r.owner %}<span class="bd-who{{ ' bd-me' if r.owner_key == who.person }}"><i style="background:var(--p-{{ r.owner_key }})"></i>{{ r.owner }}</span>{% if r.others %}<span class="bd-others" title="{{ t('tl.others_tip') }}{% for k, n in r.others %}{{ n }}{{ t('sep') if not loop.last }}{% endfor %}"><em>+</em>{% for k, n in r.others %}<span class="bd-who{{ ' bd-me' if k == who.person }}"><i style="background:var(--p-{{ k }})"></i>{{ n }}</span>{% endfor %}</span>{% endif %}{% elif r.kind == 'version' %}{% for k, n in r.people %}<span class="bd-who" title="{{ t('tl.version_owners_tip') }}"><i style="background:var(--p-{{ k }})"></i>{{ n }}</span>{% endfor %}{% endif %}{% if r.sample %}<span class="bd-sampletag">{{ t('sample.tag') }}</span>{% endif %}{% if r.version_name %}<a class="bd-vn" href="{{ r.version_href }}" title="{{ t('ver.title', name=r.version_name) }}">{{ r.version_name }}</a>{% endif %}</div>
+          <div class="bd-lbl-text"><div class="bd-lbl-title">{% if r.gid %}<span class="bd-gid">{{ r.gid }}{% if r.source %}<span class="bd-src" title="{{ t('tl.source_tip') }}"> · {{ r.source }}</span>{% endif %}</span>{% endif %}<a href="{{ r.href }}" title="{{ r.full_title }}">{{ r.title }}</a>{% if r.owner %}<span class="bd-who{{ ' bd-me' if r.owner_key == who.person }}"><i style="background:var(--p-{{ r.owner_key }})"></i>{{ r.owner }}</span>{% if r.others %}<span class="bd-others" title="{{ t('tl.others_tip') }}{% for k, n in r.others %}{{ n }}{{ t('sep') if not loop.last }}{% endfor %}"><em>+</em>{% for k, n in r.others %}<span class="bd-who{{ ' bd-me' if k == who.person }}"><i style="background:var(--p-{{ k }})"></i>{{ n }}</span>{% endfor %}</span>{% endif %}{% elif r.kind == 'version' %}{% for k, n in r.people %}<span class="bd-who" title="{{ t('tl.version_owners_tip') }}"><i style="background:var(--p-{{ k }})"></i>{{ n }}</span>{% endfor %}{% endif %}{% if r.sample %}<span class="bd-sampletag">{{ t('sample.tag') }}</span>{% endif %}{% if r.version_name %}{% if r.version_href %}<a class="bd-vn" href="{{ r.version_href }}" title="{{ t('ver.title', name=r.version_name) }}">{{ r.version_name }}</a>{% else %}<span class="bd-vn" title="{{ t('ver.title', name=r.version_name) }}">{{ r.version_name }}</span>{% endif %}{% endif %}</div>
             {#- 折叠 / 悬停的提示放在第二行（挤在名字那行会把名字挤没、还溢出到图里），放不下就省略号、悬停看全文 -#}
             <div class="bd-info">{{ r.start_text }} · {{ r.plan_text }}{% if r.late %} · <span class="bd-late">{{ t('tl.late', late=r.late) }}</span>{% endif %}{% if r.ended_text %} · <span class="bd-{{ r.ended }}-text">{{ r.ended_text }}</span>{% endif %}{% if r.belongs %} · <span class="bd-belongs">{{ r.belongs }}</span>{% endif %}{% if r.elsewhere %} · {{ r.elsewhere }}{% endif %}<span class="bd-hidden-note"></span><span class="bd-fam-note"></span></div>
             {#- 版本行：这次发布装着哪些目标，一行一个、点一下进那个目标（只挂一个目标的版本不成行，成行的要看得出装了什么） -#}
@@ -39,7 +39,7 @@
           {%- if r.overflow %}<i class="bd-over" style="left:{{ r.overflow[0] }}%;width:{{ r.overflow[1] }}%" title="{{ t('tl.over_tip') }}"></i>{% if r.late %}<span class="bd-late-label" style="left:{{ r.overflow[0] + r.overflow[1] }}%">{{ t('tl.late', late=r.late) }}</span>{% endif %}{% endif %}
           {%- if r.start_x is not none %}<span class="bd-start-label" style="left:{{ r.start_x }}%">{{ r.start_text }}</span>{% endif %}
           {%- if r.ended_x is not none %}<i class="bd-end bd-end-{{ r.ended }}" style="left:{{ r.ended_x }}%" title="{{ r.ended_text }}">{{ '✓' if r.ended == 'done' else '✕' }}</i>{% endif %}
-          {%- for m in r.marks %}<i class="bd-mark{{ ' replan' if m.replan }}" style="left:{{ m.x }}%" title="{{ m.label }}"></i><span class="bd-mark-label{{ ' flip' if m.flip }}" style="left:{{ m.x }}%">{{ m.label }}</span>{% endfor %}
+          {%- for m in r.marks %}<i class="bd-mark{{ ' orig' if m.orig }}" style="left:{{ m.x }}%" title="{{ m.label }}"></i><span class="bd-mark-label{{ ' flip' if m.flip }}{{ ' orig' if m.orig }}" style="left:{{ m.x }}%">{{ m.label }}</span>{% endfor %}
         </div>
       </div>
       {%- endfor %}
@@ -148,16 +148,20 @@
       el.textContent = el.dataset.label || "";
       if (el.scrollWidth > el.clientWidth + 1) { el.textContent = ""; }
     });
-    {# 图上方那行字（开始 / 计划 / 延期）挤在一起时，按「计划 > 延期 > 开始」留，名称下面一行三样都有 #}
+    {# 图上方那行字（开始 / 计划 / 延期 / 原计划）挤在一起时，按「计划 > 延期 > 开始 > 原计划」留，名称下面一行都有 #}
     function clash(a, b) {
       var x = a.getBoundingClientRect(), y = b.getBoundingClientRect();
       return x.right + 4 > y.left && y.right + 4 > x.left;
     }
     tl.querySelectorAll(".bd-chart").forEach(function (c) {
-      var m = c.querySelector(".bd-mark-label"), l = c.querySelector(".bd-late-label"), s = c.querySelector(".bd-start-label");
+      var m = c.querySelector(".bd-mark-label:not(.orig)"), l = c.querySelector(".bd-late-label"), s = c.querySelector(".bd-start-label");
       [l, s].forEach(function (el) { if (el) { el.style.visibility = ""; } });
       if (l && m && clash(l, m)) { l.style.visibility = "hidden"; }
       if (s && ((m && clash(s, m)) || (l && l.style.visibility !== "hidden" && clash(s, l)))) { s.style.visibility = "hidden"; }
+      c.querySelectorAll(".bd-mark-label.orig").forEach(function (o) {
+        o.style.visibility = "";
+        if ([m, l, s].some(function (el) { return el && el.style.visibility !== "hidden" && clash(o, el); })) { o.style.visibility = "hidden"; }
+      });
     });
   }
 

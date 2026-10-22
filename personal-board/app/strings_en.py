@@ -47,6 +47,7 @@ EN: dict[str, str] = {
     "abandon.default": "Abandoned",
     "label.what": "What",
     "label.done_what": "Done",
+    "label.version_name": "Version",
     "stage.open": "in progress",
     "stage.ended": "ended {at}",
     "stage.none": "No stage",
@@ -101,6 +102,8 @@ EN: dict[str, str] = {
                        "`point_zone` / `repeat` may change with it (`repeat=none` makes it a one-off); a note is logged. Cancel with status=abandoned: no more dots, and it cannot be un-cancelled (create a new one). "
                        "`what` / `done_what` edit the \"What\" / \"Done\" text (only when the human asks; an empty string clears it): `done_what` only on a completed goal — "
                        "a long-running row writes it per version (release). For a goal already on the team board this logs one \"summary edited\" entry (unpushed), pushed at wrap-up as the team board's edit_goal. "
+                       "`version_name` is the version badge (e.g. \"v1.2\", at most 40 characters on the team board): on a goal already on the team board a changed badge goes into the same \"summary edited\" entry; "
+                       "a long-running row's badge changes through release and is not pushed. "
                        "When abandoning, `reason` says why in one sentence; the detail page shows it where \"Done\" would be.",
     "act.log": "Log an entry: kind=start / result (a visible result) / wrap (wrapping up) / note / digest (a lesson or rule written into a handbook or knowledge base; "
                "write \"Handbook x.y.z: what was added\"). `stage` is one of the configured stages or empty (no stage). "
@@ -122,7 +125,8 @@ EN: dict[str, str] = {
     "act.todo_done": "Mark a to-do done.",
     "act.note_add": "Save a dictation from the page's dictation box (used by the page).",
     "act.note_resolve": "Mark a dictation as handled once the AI has logged it, with one sentence on what was logged.",
-    "act.sync_mark": "Mark entries as pushed to the team board (status=pushed) or not to be pushed (skip). `entry_ids` is a list of entry ids; `team_ref` is the event id the team board returned.",
+    "act.sync_mark": "Mark entries as pushed to the team board (status=pushed) or not to be pushed (skip). `entry_ids` is a list of entry ids; `team_ref` is the event id the team board returned. "
+                     "A plan change on a team-line goal cannot be marked skip (the whole batch is refused): it must reach the team board so both boards measure delay from the same plan; void one logged by mistake.",
     "act.void": "Void an entry logged by mistake (it stays on record; nothing is deleted).",
 
     # ---------- write errors ----------
@@ -181,6 +185,8 @@ EN: dict[str, str] = {
     "err.bad_sync_status": "status must be pushed or skip",
     "err.bad_entry_ids": "entry_ids must be a list of entry ids, got {value}",
     "err.not_pending": "Entry {id} is not waiting to be pushed",
+    "err.due_skip": "A plan change has to be pushed to the team board so both boards use the same plan; it cannot be marked skip: {which} changes the plan. Nothing in this batch was marked; void a plan change logged by mistake",
+    "err.due_skip_item": "entry {id} ({gnum} {title})",
     "err.void": "Entry {id} does not exist or is already voided",
     "err.not_point_done": "{gnum} is not a point task (finish an ordinary goal with complete)",
     "err.point_cancelled": "{gnum} is cancelled",
@@ -428,7 +434,7 @@ EN: dict[str, str] = {
     "js.stage_of": "{stage} stage",
     "js.started": "Started {at}",
     "js.plan_at": "Plan {at}",
-    "js.moved_to": "Moved to {at}",
+    "js.orig_at": "Originally {at}",
     "js.items_folded": "{n} hidden",
     "js.items_n": "{n}",
     "js.none_here": "Nothing in this period",

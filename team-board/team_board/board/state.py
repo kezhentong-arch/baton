@@ -1,7 +1,7 @@
 """把事件折叠成当前状态，并算出看板要的数字。全是纯函数，`now` 由调用方传入。
 
-口径：耗时是日历时间；暂停期间不算进任何环节；延期以立项时的基准日为准，
-「等外部」的天数单独写出。环节可以重叠、反复交替，不算「回退」。
+口径：耗时是日历时间；暂停期间不算进任何环节；延期从现在的计划（最后一次定的）算，
+延期里「等外部」的那段单独写出。环节可以重叠、反复交替，不算「回退」。
 """
 from __future__ import annotations
 
@@ -420,19 +420,34 @@ def late_days(deadline: datetime, end: datetime) -> float:
     return round(sec / 86400, 2) if sec >= 3600 else 0.0
 
 
+def _counts_late(g: Goal) -> bool:
+    """算不算延期：有现在的计划、不是长期行、没放弃（同个人看板 timeline.js lateOf 的判断）。"""
+    return g.latest_due is not None and not g.long_term and g.status != "abandoned"
+
+
 def delay(g: Goal, now: datetime) -> tuple[float, float]:
-    """(超出基准日的天数, 其中等外部的天数)。没有基准日或已放弃的不算延期。接口里的 delay_days 用它。"""
-    if g.baseline_due is None or g.status == "abandoned":
+    """(超出现在计划的天数, 其中等外部的天数)。现在计划 = 最后一次定的计划完成日：改了期、新日期没到就不算延期，
+    过了才从新日期算。没定计划、长期行或已放弃的不算延期。接口里的 delay_days 用它。"""
+    if not _counts_late(g):
         return 0, 0.0
-    late = late_days(g.baseline_due.at, _until(g, now))
-    return (late, pause_days(g, now)["external"]) if late else (0, 0.0)
+    late = late_days(g.latest_due.at, _until(g, now))
+    return (late, days(late_external(g, now))) if late else (0, 0.0)
 
 
 def delay_text(g: Goal, now: datetime) -> str:
-    """页面上写的延期：不满一天按小时（计划到小时后，延 3 小时不该写成「延期 1 天」）。"""
-    if g.baseline_due is None or g.status == "abandoned":
+    """页面上写的延期：从现在的计划算（同 delay），不满一天按小时（计划到小时后，延 3 小时不该写成「延期 1 天」）。"""
+    if not _counts_late(g):
         return ""
-    return late_text(g.baseline_due.at, _until(g, now))
+    return late_text(g.latest_due.at, _until(g, now))
+
+
+def late_external(g: Goal, now: datetime) -> timedelta:
+    """延期那段里等外部停了多久：现在的计划到现在（做完的到完成那一刻）这段，和「等外部」暂停重叠的时长。
+    不拿全部等外部的总时长：计划之前等的不算延期，否则改期以后会写出「已超出 10 小时（其中等外部 6 天）」。"""
+    if not _counts_late(g):
+        return timedelta(0)
+    start, until = g.latest_due.at, _until(g, now)
+    return sum((_overlap(start, until, p.start, p.end or until) for p in g.pauses if p.kind == "external"), timedelta(0))
 
 
 def blamed_children(g: Goal, b: Board, now: datetime) -> list[int]:

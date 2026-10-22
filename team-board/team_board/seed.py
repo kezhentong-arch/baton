@@ -217,7 +217,7 @@ def seed_demo(conn: sqlite3.Connection, lang: str, today: date | None = None) ->
               note=tx["g1.3.note"])
     # G4：长期负责的人自己在下面拆带日期的块给自己
     g41 = act(M1, "create", at(B4, 1), title=tx["g4.1"], owner=m1.id, parent_id=g4, due=due(B4, 8), note=tx["g4.1.note"])
-    g42 = act(M1, "create", at(B4, 7), title=tx["g4.2"], owner=m1.id, parent_id=g4, due=due(B4, 9), note=tx["g4.2.note"])
+    g42 = act(M1, "create", at(B4, 7), title=tx["g4.2"], owner=m1.id, parent_id=g4, due=due(B4, 8), note=tx["g4.2.note"])
     g43 = act(M1, "create", at(B4, 9), title=tx["g4.3"], owner=m1.id, parent_id=g4, due=due(B4, 13), note=tx["g4.3.note"])
     # G6：一个目标拆三块——推送服务整包给别人；提醒页面不用等谁；调度逻辑的开发要等推送服务
     g61 = act(OWN, "create", at(B6, 3), title=tx["g6.1"], owner=m1.id, parent_id=g6, due=due(B6, 17), note=tx["g6.1.note"])
@@ -241,11 +241,11 @@ def seed_demo(conn: sqlite3.Connection, lang: str, today: date | None = None) ->
     # ---- G3：上周已完成 ----
     steps += stages_(OWN, g3, B3, [(PRODUCT, 0, 2), (DEV, 2, 7), (TEST, 6, 9)])
     steps += [(at(B3, 9), OWN, "complete", {"goal_id": g3, "done_what": tx["g3.done"]})]
-    # ---- G4：三块各自记环节；第二块改过计划日（原定的日子已过 → 显示延期）----
+    # ---- G4：三块各自记环节；第二块改过计划日，改到的日子也过了 → 显示延期（延期从现在的计划算）----
     steps += stages_(M1, g41, B4, [(DEV, 1, 6), (TEST, 5, 7)])
     steps += [(at(B4, 7), M1, "complete", {"goal_id": g41, "done_what": tx["g4.1.done"]})]
     steps += stages_(M1, g42, B4, [(DEV, 7, None)])
-    steps += [(at(B4, 8.5), M1, "change_due", {"goal_id": g42, "due": due(B4, 16), "reason": tx["g4.2.due_reason"]})]
+    steps += [(at(B4, 7.5), M1, "change_due", {"goal_id": g42, "due": due(B4, 9), "reason": tx["g4.2.due_reason"]})]
     steps += stages_(M1, g43, B4, [(PRODUCT, 9, None)])
     # ---- G6 ----
     steps += stages_(OWN, g6, B6, [(BIZ, 0, 3)])
